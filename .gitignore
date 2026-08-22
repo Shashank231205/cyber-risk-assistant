@@ -26,11 +26,16 @@ data/outputs/*
 *.pkl
 *.joblib
 
-# Reference corpora are fetched by scripts/, not committed (size + licensing).
+# Reference corpora are committed so that a clone runs with no network access
+# and every run is reproducible against a known snapshot. Both sources are
+# public domain works of the US government. Refresh with
+# scripts/fetch_reference_data.py; the manifest records what was retrieved.
 data/reference/*
 !data/reference/.gitkeep
 !data/reference/README.md
-!data/reference/*.lock.json
+!data/reference/manifest.json
+!data/reference/kev_catalogue.json
+!data/reference/nist_sp800_53_controls.json
 
 # ---------------------------------------------------------------------------
 # Python
