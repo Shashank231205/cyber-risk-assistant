@@ -1,0 +1,154 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cyber-risk-assistant"
+version = "1.0.0"
+description = "Evidence-based cyber risk prioritisation with grounded NIST SP 800-53 remediation guidance."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "pydantic>=2.9.0",
+    "pydantic-settings>=2.6.0",
+    "httpx>=0.27.0",
+    "jinja2>=3.1.4",
+    "structlog>=24.4.0",
+    "slowapi>=0.1.9",
+    "fastembed>=0.4.0",
+    "numpy>=1.26.0",
+]
+
+[project.optional-dependencies]
+faiss = ["faiss-cpu>=1.9.0"]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-cov>=6.0.0",
+    "pytest-asyncio>=0.24.0",
+    "ruff>=0.7.0",
+    "mypy>=1.13.0",
+    "black>=24.10.0",
+    "bandit[toml]>=1.7.10",
+    "pip-audit>=2.7.3",
+    "pre-commit>=4.0.0",
+]
+
+[project.scripts]
+cyber-risk = "cyber_risk.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+cyber_risk = ["prompts/*.md", "api/templates/*.html"]
+
+# ---------------------------------------------------------------------------
+# Ruff -- lint + format
+# ---------------------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",    # pycodestyle
+    "F",         # pyflakes
+    "I",         # isort
+    "N",         # pep8-naming
+    "UP",        # pyupgrade
+    "B",         # flake8-bugbear
+    "A",         # flake8-builtins
+    "C4",        # flake8-comprehensions
+    "DTZ",       # flake8-datetimez
+    "T20",       # flake8-print   -- no stray print() in library code
+    "SIM",       # flake8-simplify
+    "PTH",       # flake8-use-pathlib
+    "RET",       # flake8-return
+    "ARG",       # unused arguments
+    "TRY",       # tryceratops
+    "RUF",       # ruff-specific
+    "S",         # bandit rules
+    "D",         # pydocstyle
+]
+ignore = [
+    "D107",  # __init__ docstring -- covered by the class docstring
+    "D203",  # incompatible with D211
+    "D213",  # incompatible with D212
+    "TRY003",# long messages in raise are acceptable and readable here
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "D100", "D101", "D102", "D103", "ARG001", "ARG002"]
+"scripts/**" = ["T201"]  # scripts are CLIs; stdout is their interface
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+# ---------------------------------------------------------------------------
+# mypy -- strict
+# ---------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_unreachable = true
+warn_unused_ignores = true
+disallow_any_generics = true
+no_implicit_reexport = true
+show_error_codes = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["fastembed.*", "faiss.*", "slowapi.*"]
+ignore_missing_imports = true
+
+# ---------------------------------------------------------------------------
+# pytest
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "-ra",
+    "--cov=cyber_risk",
+    "--cov-report=term-missing",
+    "--cov-report=xml",
+    "--cov-fail-under=80",
+]
+markers = [
+    "unit: isolated, no I/O",
+    "integration: crosses a component boundary",
+    "e2e: exercises the running API",
+    "evaluation: scoring and retrieval quality gates",
+    "network: requires outbound network access",
+]
+asyncio_mode = "auto"
+
+[tool.coverage.run]
+branch = true
+source = ["src/cyber_risk"]
+omit = ["*/__main__.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    '@(abc\.)?abstractmethod',
+]
+
+# ---------------------------------------------------------------------------
+# Bandit -- SAST
+# ---------------------------------------------------------------------------
+[tool.bandit]
+exclude_dirs = ["tests", ".venv", "build", "dist"]
+
+[tool.black]
+line-length = 100
+target-version = ["py310"]
