@@ -15,9 +15,10 @@ from __future__ import annotations
 from enum import Enum
 from functools import lru_cache
 from pathlib import Path
+from typing import Annotated
 
 from pydantic import Field, SecretStr, field_validator, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 from typing_extensions import Self
 
 PROJECT_ROOT: Path = Path(__file__).resolve().parents[3]
@@ -101,11 +102,17 @@ class Settings(BaseSettings):
     # -- Application --------------------------------------------------------
     app_env: Environment = Environment.DEVELOPMENT
     log_level: str = "INFO"
-    api_host: str = "0.0.0.0"  # noqa: S104 - container workloads must bind all interfaces
+    # Binding all interfaces is required inside a container, where the platform
+    # -- not the process -- controls what is reachable from outside. Suppressed
+    # for both scanners: ruff reports S104, bandit reports B104.
+    api_host: str = "0.0.0.0"  # noqa: S104  # nosec B104
     api_port: int = Field(default=8000, ge=1, le=65535)
 
     # -- LLM provider chain -------------------------------------------------
-    llm_provider_order: tuple[LLMProviderName, ...] = (
+    # NoDecode keeps the settings source from JSON-decoding these values, so
+    # the comma-separated form documented in .env.example reaches the
+    # validator below instead of failing to parse at startup.
+    llm_provider_order: Annotated[tuple[LLMProviderName, ...], NoDecode] = (
         LLMProviderName.GEMINI,
         LLMProviderName.GROQ,
         LLMProviderName.OPENROUTER,
@@ -153,7 +160,7 @@ class Settings(BaseSettings):
 
     # -- Security -----------------------------------------------------------
     rate_limit_per_minute: int = Field(default=30, ge=1, le=10_000)
-    cors_allowed_origins: tuple[str, ...] = ("*",)
+    cors_allowed_origins: Annotated[tuple[str, ...], NoDecode] = ("*",)
     demo_access_token: SecretStr | None = None
 
     @field_validator("log_level", mode="before")
@@ -164,6 +171,26 @@ class Settings(BaseSettings):
         if level not in allowed:
             raise ValueError(f"log_level must be one of {sorted(allowed)}, got {value!r}")
         return level
+
+    @field_validator(
+        "gemini_api_key",
+        "groq_api_key",
+        "openrouter_api_key",
+        "demo_access_token",
+        mode="before",
+    )
+    @classmethod
+    def _blank_secret_is_unset(cls, value: object) -> object:
+        """Treat a blank value as unset rather than as an empty credential.
+
+        ``.env.example`` ships every key blank. Without this, a blank entry
+        would parse as an empty secret, the provider would count as
+        configured, and the chain would call it with no credential instead of
+        falling through to the next provider.
+        """
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
 
     @field_validator("llm_provider_order", "cors_allowed_origins", mode="before")
     @classmethod
