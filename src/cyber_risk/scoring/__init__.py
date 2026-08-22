@@ -1,0 +1,1 @@
+"""The deterministic risk model."""
