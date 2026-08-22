@@ -40,13 +40,13 @@ __pycache__/
 *$py.class
 *.so
 .Python
-build/
-develop-eggs/
-dist/
+/build/
+/develop-eggs/
+/dist/
 eggs/
 .eggs/
 sdist/
-wheels/
+/wheels/
 *.egg-info/
 *.egg
 MANIFEST
@@ -55,8 +55,8 @@ MANIFEST
 # Environments
 .venv/
 venv/
-env/
-ENV/
+/env/
+/ENV/
 .python-version
 
 # Tooling caches
@@ -77,8 +77,8 @@ coverage.xml
 # ---------------------------------------------------------------------------
 # Models / embedding caches (large binaries)
 # ---------------------------------------------------------------------------
-.cache/
-models/
+/.cache/
+/models/
 .fastembed_cache/
 .huggingface/
 *.onnx
@@ -88,7 +88,7 @@ models/
 # ---------------------------------------------------------------------------
 # Logs & runtime
 # ---------------------------------------------------------------------------
-logs/
+/logs/
 *.log
 *.db
 *.sqlite
