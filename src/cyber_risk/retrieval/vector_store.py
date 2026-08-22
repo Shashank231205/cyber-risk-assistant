@@ -158,6 +158,7 @@ class FaissVectorStore(NumpyVectorStore):
     def __init__(self) -> None:
         super().__init__()
         self._index: object | None = None
+        self._reported_absence = False
 
     def add(self, vectors: Vector, document_ids: list[str]) -> None:
         """Add vectors and the identifiers they correspond to."""
@@ -193,7 +194,11 @@ class FaissVectorStore(NumpyVectorStore):
         try:
             import faiss
         except ImportError:
-            logger.info("faiss is not installed; using exact search instead")
+            # Logged once per store rather than per search: the condition is a
+            # deployment fact, not an event.
+            if not self._reported_absence:
+                logger.info("faiss is not installed; using exact search instead")
+                self._reported_absence = True
             return None
 
         index: object = faiss.IndexFlatIP(self._vectors.shape[1])

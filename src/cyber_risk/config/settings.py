@@ -134,7 +134,7 @@ class Settings(BaseSettings):
     embedding_batch_size: int = Field(default=32, ge=1, le=512)
 
     # -- Retrieval ----------------------------------------------------------
-    vector_backend: VectorBackendName = VectorBackendName.FAISS
+    vector_backend: VectorBackendName = VectorBackendName.NUMPY
     vector_index_path: Path = Path("data/processed/nist_index")
     retrieval_top_k: int = Field(default=4, ge=1, le=25)
     retrieval_min_score: float = Field(default=0.30, ge=0.0, le=1.0)

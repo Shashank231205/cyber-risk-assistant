@@ -181,32 +181,41 @@ class TestQueryConstruction:
         assert make_vuln().vulnerability_name in query
         assert len(query) > len(make_vuln().vulnerability_name) * 2
 
+    def test_query_leads_with_the_action_required(self) -> None:
+        """Leading with the threat retrieves deception controls, not remediation."""
+        assert build_query(make_risk()).lower().startswith("remediate a software flaw")
+
     def test_exposure_is_described(self) -> None:
-        assert "internet-facing" in build_query(make_risk())
+        """Reachability should pull in boundary protection language."""
+        assert "boundary protection" in build_query(make_risk()).lower()
 
     def test_ransomware_evidence_is_described(self) -> None:
-        query = build_query(make_risk(intel=(make_intel(),)))
-        assert "ransomware" in query
+        """Ransomware exposure should pull in recovery language."""
+        query = build_query(make_risk(intel=(make_intel(),))).lower()
+        assert "recovery" in query
+        assert "contingency" in query
 
     def test_absent_monitoring_is_described(self) -> None:
-        query = build_query(make_risk(asset=make_asset(edr_installed="No")))
+        query = build_query(make_risk(asset=make_asset(edr_installed="No"))).lower()
         assert "monitoring" in query
+        assert "endpoint detection" in query
 
     def test_unavailable_patch_is_described(self) -> None:
         query = build_query(make_risk(vulnerability=make_vuln(patch_available="No")))
-        assert "compensating controls" in query
+        assert "compensating controls" in query.lower()
+        assert "unsupported" in query.lower()
 
     def test_control_deficiency_is_described_differently_from_a_flaw(self) -> None:
         """A missing control has no patch, so patch language would mislead."""
         deficiency = build_query(make_risk(vulnerability=make_vuln(cve="CTRL-SYN-001")))
         flaw = build_query(make_risk())
 
-        assert "missing or ineffective security control" in deficiency
-        assert "patch management" in flaw
-        assert "patch management" not in deficiency
+        assert "missing security control" in deficiency.lower()
+        assert "patch management" in flaw.lower()
+        assert "patch management" not in deficiency.lower()
 
     def test_unowned_asset_is_described(self) -> None:
-        query = build_query(make_risk(asset=make_asset(owner_team="")))
+        query = build_query(make_risk(asset=make_asset(owner_team=""))).lower()
         assert "ownership" in query
 
 

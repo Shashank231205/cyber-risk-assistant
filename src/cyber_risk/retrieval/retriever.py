@@ -70,37 +70,62 @@ def build_query(risk: CorrelatedRisk) -> str:
     only the vulnerability title retrieves whatever control happens to mention
     that vendor, which is rarely the one that addresses the problem.
     """
-    parts: list[str] = [risk.vulnerability.vulnerability_name]
+    parts: list[str] = []
 
+    # Lead with the action required. Describing the threat instead retrieves
+    # controls about adversary deception and misdirection, which are a poor
+    # answer to "what should we do about this".
     if risk.vulnerability.finding_kind is FindingKind.CONTROL_DEFICIENCY:
-        parts.append("missing or ineffective security control")
+        parts.append(
+            "Implement and assess a missing security control. "
+            "Control implementation, assessment and configuration management"
+        )
     else:
-        parts.append("software flaw requiring remediation and patch management")
-
-    if risk.is_internet_facing:
-        parts.append("internet-facing system boundary protection")
+        parts.append(
+            "Remediate a software flaw. Flaw remediation, install security "
+            "patches and updates, patch management, corrective action"
+        )
 
     if risk.vulnerability.exploit_available or risk.intel:
-        parts.append("actively exploited vulnerability requiring incident response")
+        parts.append(
+            "Vulnerability monitoring and scanning, remediate identified "
+            "vulnerabilities within defined response times"
+        )
+
+    if risk.is_internet_facing:
+        parts.append(
+            "Boundary protection for an externally reachable system, restrict "
+            "external network connections"
+        )
 
     if risk.ransomware_linked:
-        parts.append("ransomware threat containment and recovery")
+        parts.append(
+            "Incident handling and recovery, system backup and restoration, "
+            "contingency planning"
+        )
 
     if not risk.asset.edr_installed:
-        parts.append("continuous monitoring and malicious code protection")
+        parts.append(
+            "Continuous monitoring, malicious code protection, endpoint "
+            "detection and response"
+        )
 
     if not risk.vulnerability.patch_available:
-        parts.append("unsupported component compensating controls")
+        parts.append(
+            "Unsupported system component without vendor support, compensating "
+            "controls"
+        )
 
     if not risk.vulnerability.auth_required:
-        parts.append("unauthenticated access control and identification")
+        parts.append("Access enforcement, identification and authentication of users")
 
     if not risk.asset.has_owner:
-        parts.append("system ownership and responsibility assignment")
+        parts.append("Assign system ownership and responsibility for remediation")
 
     if risk.asset.is_stale:
-        parts.append("system component inventory accuracy")
+        parts.append("Maintain an accurate system component inventory")
 
+    parts.append(risk.vulnerability.vulnerability_name)
     if risk.vulnerability.affected_component:
         parts.append(risk.vulnerability.affected_component)
 

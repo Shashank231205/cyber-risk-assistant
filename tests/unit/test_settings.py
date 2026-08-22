@@ -29,7 +29,7 @@ class TestDefaults:
         assert s.configured_providers == ()
         assert s.risk_top_n == 5
         assert s.embedding_backend is EmbeddingBackendName.LOCAL
-        assert s.vector_backend is VectorBackendName.FAISS
+        assert s.vector_backend is VectorBackendName.NUMPY
 
     def test_defaults_are_development(self) -> None:
         s = build()
