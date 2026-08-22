@@ -47,7 +47,7 @@ cyber-risk = "cyber_risk.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-cyber_risk = ["prompts/*.md", "api/templates/*.html"]
+cyber_risk = ["py.typed", "prompts/*.md", "api/templates/*.html"]
 
 # ---------------------------------------------------------------------------
 # Ruff -- lint + format
@@ -144,6 +144,8 @@ exclude_lines = [
     "if TYPE_CHECKING:",
     "raise NotImplementedError",
     '@(abc\.)?abstractmethod',
+    # Protocol method bodies are declarations, never executed.
+    '^\s*\.\.\.$',
 ]
 
 # ---------------------------------------------------------------------------

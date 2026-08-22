@@ -24,6 +24,7 @@ import csv
 import hashlib
 import io
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -130,11 +131,40 @@ def parse_kev(payload: bytes) -> tuple[KevEntry, ...]:
     return entries
 
 
-def _collect_prose(parts: list[dict[str, Any]] | None, wanted: str) -> str:
-    """Gather prose from a control's nested parts by role.
+#: The catalogue leaves placeholders where an organisation supplies its own
+#: value, for example a patch installation deadline. Left in place they reach
+#: the reader as template syntax; replaced, the sentence still reads correctly
+#: and honestly signals that the organisation decides the value.
+_PARAMETER_PLACEHOLDER = re.compile(r"\{\{\s*insert:\s*param,\s*[^}]*\}\}")
+_PARAMETER_REPLACEMENT = "[organisation-defined]"
 
-    Control statements are a nested structure of labelled items; flattening
-    them preserves the readable text without inventing an ordering.
+
+def _clean_prose(text: str) -> str:
+    """Make catalogue prose readable outside its source format."""
+    return _PARAMETER_PLACEHOLDER.sub(_PARAMETER_REPLACEMENT, text).strip()
+
+
+def _flatten_prose(parts: list[dict[str, Any]] | None) -> list[str]:
+    """Gather every piece of prose beneath a part, in document order."""
+    if not parts:
+        return []
+
+    collected: list[str] = []
+    for part in parts:
+        if prose := part.get("prose"):
+            collected.append(_clean_prose(str(prose)))
+        collected.extend(_flatten_prose(part.get("parts")))
+    return [item for item in collected if item]
+
+
+def _collect_prose(parts: list[dict[str, Any]] | None, wanted: str) -> str:
+    """Gather the prose of a control section by role.
+
+    A section's text is a nested structure of labelled items whose child parts
+    carry their own names, so everything beneath the matching section is
+    collected rather than only the parts that repeat its name. Matching on the
+    child names instead loses the body of most controls while still returning a
+    plausible-looking result.
     """
     if not parts:
         return ""
@@ -143,11 +173,9 @@ def _collect_prose(parts: list[dict[str, Any]] | None, wanted: str) -> str:
     for part in parts:
         if part.get("name") == wanted:
             if prose := part.get("prose"):
-                collected.append(str(prose).strip())
-            nested = _collect_prose(part.get("parts"), wanted)
-            if nested:
-                collected.append(nested)
-    return "\n".join(item for item in collected if item)
+                collected.append(_clean_prose(str(prose)))
+            collected.extend(_flatten_prose(part.get("parts")))
+    return "\n".join(collected)
 
 
 def _walk_groups(groups: list[dict[str, Any]], family: str = "") -> list[ControlDocument]:
@@ -200,7 +228,15 @@ def parse_nist_catalogue(payload: bytes) -> tuple[ControlDocument, ...]:
             detail="no control groups were present in the published catalogue",
         )
 
-    controls = tuple(c for c in _walk_groups(groups) if c.control_id and c.title)
+    # Controls withdrawn from the catalogue keep a title but carry no text.
+    # Indexing them means competing against real controls on a title alone,
+    # which is how a search for flaw remediation returns a withdrawn
+    # enhancement instead of the control that governs it.
+    controls = tuple(
+        c
+        for c in _walk_groups(groups)
+        if c.control_id and c.title and (c.statement or c.discussion)
+    )
     if not controls:
         raise ReferenceDataError(
             "The security control catalogue contained no controls.",
