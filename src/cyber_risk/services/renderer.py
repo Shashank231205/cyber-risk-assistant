@@ -89,9 +89,12 @@ def render_report(report: RiskReport) -> str:
         "flaw on an isolated host ranks below a lesser flaw on an "
         "internet-facing payment system under active attack.",
         "",
-        "---",
-        "",
     ]
+
+    if report.summary:
+        lines.extend(["## Summary for the board", "", report.summary, ""])
+
+    lines.extend(["---", ""])
 
     if report.is_empty:
         lines.append("No risks could be ranked from the supplied data.")

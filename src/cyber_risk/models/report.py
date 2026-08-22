@@ -98,6 +98,7 @@ class RiskReport(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     entries: tuple[RiskEntry, ...]
+    summary: str = ""
     quality: DataQualityReport
     provenance: ReportProvenance
     total_findings: int = Field(ge=0)

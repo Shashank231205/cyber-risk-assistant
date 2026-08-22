@@ -112,7 +112,22 @@ class TestPromptAssembly:
 
     def test_system_prompt_forbids_invention(self) -> None:
         instructions = load_system_prompt().lower()
-        assert "do not add" in instructions
+        assert "never introduce" in instructions
+        assert "only the evidence supplied" in instructions
+
+    def test_system_prompt_defines_its_input(self) -> None:
+        """The model must know what each supplied field means."""
+        instructions = load_system_prompt().lower()
+        assert "input you will receive" in instructions
+        assert "output format" in instructions
+
+    def test_system_prompt_gives_a_worked_example(self) -> None:
+        assert "worked example" in load_system_prompt().lower()
+
+    def test_system_prompt_states_the_uncertainty_rule(self) -> None:
+        """Absence of evidence must not become evidence of absence."""
+        instructions = load_system_prompt().lower()
+        assert "absence of evidence is never evidence of absence" in instructions
 
     def test_system_prompt_treats_evidence_as_data(self) -> None:
         """The advisory arrives from outside, so its text is never an instruction."""
@@ -371,3 +386,125 @@ class TestReportService:
     async def test_rendered_output_is_readable(self, pack: DataPack) -> None:
         report = await self._service(pack).generate()
         assert "# Cyber Risk Briefing" in render_report(report)
+
+
+@pytest.mark.unit
+class TestSecondGeminiCredential:
+    """A second Gemini credential extends the chain.
+
+    Free-tier quota is counted per key, so exhausting the first is worth
+    retrying on the second before a different provider produces different
+    wording.
+    """
+
+    def test_second_credential_adds_a_provider(self) -> None:
+        from cyber_risk.services.llm import build_providers
+
+        providers = build_providers(
+            Settings(_env_file=None, gemini_api_key="a", gemini_api_key_secondary="b")
+        )
+        assert [p.name.split(":")[0] for p in providers] == ["gemini", "gemini-2"]
+
+    def test_both_credentials_use_the_same_model(self) -> None:
+        from cyber_risk.services.llm import build_providers
+
+        providers = build_providers(
+            Settings(_env_file=None, gemini_api_key="a", gemini_api_key_secondary="b")
+        )
+        assert {p.name.split(":", 1)[1] for p in providers} == {"gemini-3.5-flash-lite"}
+
+    def test_second_credential_alone_is_sufficient(self) -> None:
+        """Setting only the second must not be equivalent to setting none."""
+        from cyber_risk.services.llm import build_providers
+
+        providers = build_providers(Settings(_env_file=None, gemini_api_key_secondary="b"))
+        assert len(providers) == 1
+
+    def test_blank_second_credential_is_ignored(self) -> None:
+        from cyber_risk.services.llm import build_providers
+
+        providers = build_providers(
+            Settings(_env_file=None, gemini_api_key="a", gemini_api_key_secondary="  ")
+        )
+        assert len(providers) == 1
+
+    def test_second_credential_is_redacted(self) -> None:
+        settings = Settings(_env_file=None, gemini_api_key_secondary="secret-second-key")
+        assert "secret-second-key" not in repr(settings)
+        assert "secret-second-key" not in str(settings.model_dump())
+
+
+@pytest.mark.unit
+class TestExecutiveSummary:
+    """The board summary must stay at the altitude its audience reads at."""
+
+    def _figures(self, **overrides: object) -> object:
+        from cyber_risk.services.summary import SummaryFigures
+
+        entry = RiskEntry(
+            position=1,
+            scored=make_scored(
+                intel=(make_intel(),),
+                kev=KevEntry(cve_id="CVE-2024-21762", known_ransomware_campaign_use=True),
+            ),
+            control=CONTROL,
+            narrative="Paragraph.",
+        )
+        return SummaryFigures((entry,), DataQualityReport(), 114, 60)
+
+    def test_figures_are_computed_from_the_entries(self) -> None:
+        figures = self._figures()
+
+        assert figures.total_findings == 114  # type: ignore[attr-defined]
+        assert figures.internet_facing == 1  # type: ignore[attr-defined]
+        assert figures.confirmed_exploited == 1  # type: ignore[attr-defined]
+        assert figures.ransomware_linked == 1  # type: ignore[attr-defined]
+
+    def test_prompt_input_carries_no_identifiers(self) -> None:
+        """Hostnames and CVEs belong in the detail, not the board summary."""
+        rendered = self._figures().as_prompt()  # type: ignore[attr-defined]
+
+        assert "example-host" not in rendered
+        assert "CVE-" not in rendered
+
+    def test_deterministic_summary_needs_no_model(self) -> None:
+        from cyber_risk.services.summary import deterministic_summary
+
+        text = deterministic_summary(self._figures())  # type: ignore[arg-type]
+
+        assert "114 open findings" in text
+        assert "60 assets" in text
+
+    def test_deterministic_summary_names_no_asset(self) -> None:
+        from cyber_risk.services.summary import deterministic_summary
+
+        assert "example-host" not in deterministic_summary(self._figures())  # type: ignore[arg-type]
+
+    async def test_generated_summary_is_used(self) -> None:
+        from cyber_risk.services.summary import SummaryService
+
+        chain = ProviderChain((StubProvider("stub", "A board-level paragraph."),))
+        assert await SummaryService(chain).summarise(self._figures()) == (  # type: ignore[arg-type]
+            "A board-level paragraph."
+        )
+
+    async def test_no_provider_falls_back(self) -> None:
+        from cyber_risk.services.summary import SummaryService
+
+        text = await SummaryService(ProviderChain(())).summarise(self._figures())  # type: ignore[arg-type]
+        assert "114 open findings" in text
+
+    async def test_overlong_response_is_discarded(self) -> None:
+        """A summary that runs long has stopped being a summary."""
+        from cyber_risk.services.summary import SummaryService
+
+        chain = ProviderChain((StubProvider("stub", "word " * 500),))
+        text = await SummaryService(chain).summarise(self._figures())  # type: ignore[arg-type]
+        assert "114 open findings" in text
+
+    async def test_empty_report_still_summarises(self) -> None:
+        from cyber_risk.services.summary import SummaryFigures, SummaryService
+
+        figures = SummaryFigures((), DataQualityReport(), 0, 0)
+        text = await SummaryService(ProviderChain(())).summarise(figures)
+        assert "could not rank any risk" in text

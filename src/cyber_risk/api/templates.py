@@ -44,6 +44,12 @@ h1 { font-size: 1.85rem; margin: 0 0 6px; letter-spacing: -0.02em; }
   background: var(--chip); border-left: 3px solid var(--accent);
   padding: 12px 16px; margin: 22px 0; font-size: 0.9rem; color: var(--muted);
 }
+.summary { background: var(--panel); border: 1px solid var(--line);
+           border-left: 4px solid var(--accent); border-radius: 10px;
+           padding: 22px 24px; margin: 22px 0; }
+.summary h2 { font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.09em;
+              color: var(--muted); margin: 0 0 10px; }
+.summary p { margin: 0; font-size: 1.02rem; }
 .risk { background: var(--panel); border: 1px solid var(--line);
         border-radius: 10px; padding: 24px; margin: 22px 0; }
 .risk-head { display: flex; gap: 14px; align-items: baseline;
@@ -176,6 +182,13 @@ def render_page(report: RiskReport) -> str:
     """Render the complete report as a self-contained HTML page."""
     provenance = report.provenance
 
+    summary = (
+        f'<section class="summary"><h2>Summary for the board</h2>'
+        f"<p>{escape(report.summary)}</p></section>"
+        if report.summary
+        else ""
+    )
+
     if report.is_empty:
         body = "<p>No risks could be ranked from the supplied data.</p>"
     else:
@@ -221,6 +234,8 @@ def render_page(report: RiskReport) -> str:
   Remediation guidance is quoted from NIST SP 800-53 Rev. 5 as retrieved, not
   recalled from a model.
 </div>
+
+{summary}
 
 {body}
 

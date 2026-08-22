@@ -1,0 +1,24 @@
+# Render blueprint. The free instance type needs no card and is enough for
+# this workload: the report is generated once at startup and served from
+# memory thereafter.
+services:
+  - type: web
+    name: cyber-risk-assistant
+    runtime: docker
+    plan: free
+    region: frankfurt
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      # Narration keys are optional and are set in the dashboard, never here.
+      # With none configured the service still produces the full report.
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false

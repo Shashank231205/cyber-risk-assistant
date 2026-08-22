@@ -118,6 +118,10 @@ class Settings(BaseSettings):
         LLMProviderName.OPENROUTER,
     )
     gemini_api_key: SecretStr | None = None
+    # A second Gemini credential. Free-tier quota is per key, so when the first
+    # is exhausted the chain retries the same model on the second before
+    # dropping to a different provider and a different model's wording.
+    gemini_api_key_secondary: SecretStr | None = None
     gemini_model: str = "gemini-3.5-flash-lite"
     groq_api_key: SecretStr | None = None
     groq_model: str = "openai/gpt-oss-120b"
@@ -174,6 +178,7 @@ class Settings(BaseSettings):
 
     @field_validator(
         "gemini_api_key",
+        "gemini_api_key_secondary",
         "groq_api_key",
         "openrouter_api_key",
         "demo_access_token",
@@ -215,9 +220,14 @@ class Settings(BaseSettings):
         return self.app_env is Environment.PRODUCTION
 
     def api_key_for(self, provider: LLMProviderName) -> SecretStr | None:
-        """Return the configured API key for ``provider``, if any."""
+        """Return a configured API key for ``provider``, if any.
+
+        Gemini may hold two credentials. Either alone is enough for the
+        provider to count as configured, so setting only the second is not
+        silently equivalent to setting none.
+        """
         keys: dict[LLMProviderName, SecretStr | None] = {
-            LLMProviderName.GEMINI: self.gemini_api_key,
+            LLMProviderName.GEMINI: self.gemini_api_key or self.gemini_api_key_secondary,
             LLMProviderName.GROQ: self.groq_api_key,
             LLMProviderName.OPENROUTER: self.openrouter_api_key,
         }
@@ -236,6 +246,12 @@ class Settings(BaseSettings):
     def configured_providers(self) -> tuple[LLMProviderName, ...]:
         """Providers holding an API key, in the configured preference order."""
         return tuple(p for p in self.llm_provider_order if self.api_key_for(p) is not None)
+
+    @property
+    def gemini_keys(self) -> tuple[SecretStr, ...]:
+        """Every configured Gemini credential, primary first."""
+        candidates = (self.gemini_api_key, self.gemini_api_key_secondary)
+        return tuple(key for key in candidates if key is not None)
 
     def resolve_path(self, path: Path) -> Path:
         """Resolve ``path`` against the project root when it is relative."""

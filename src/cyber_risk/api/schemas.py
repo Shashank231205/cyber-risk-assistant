@@ -141,6 +141,7 @@ class ReportResponse(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
+    summary: str
     risks: tuple[RiskResponse, ...]
     total_findings: int
     total_assets: int
@@ -153,6 +154,7 @@ class ReportResponse(BaseModel):
         """Project the report onto the public shape."""
         provenance = report.provenance
         return cls(
+            summary=report.summary,
             risks=tuple(RiskResponse.from_entry(entry) for entry in report.entries),
             total_findings=report.total_findings,
             total_assets=report.total_assets,

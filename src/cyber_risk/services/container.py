@@ -25,6 +25,7 @@ from cyber_risk.retrieval.vector_store import (
 from cyber_risk.services.llm import ProviderChain, build_providers
 from cyber_risk.services.narration import NarrationService
 from cyber_risk.services.report_service import ReportService
+from cyber_risk.services.summary import SummaryService
 
 logger = get_logger(__name__)
 
@@ -74,7 +75,10 @@ class Application:
         self.chain = ProviderChain(build_providers(settings))
         self.retriever = build_retriever(settings)
         self.reports = ReportService.from_settings(
-            settings, self.retriever, NarrationService(self.chain)
+            settings,
+            self.retriever,
+            NarrationService(self.chain),
+            SummaryService(self.chain),
         )
 
         logger.info(

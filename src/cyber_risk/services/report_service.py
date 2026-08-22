@@ -30,6 +30,7 @@ from cyber_risk.retrieval.retriever import ControlRetriever, RetrievedControl
 from cyber_risk.scoring.engine import rank_risks, select_top_risks
 from cyber_risk.services.correlation import correlate, unmatched_intelligence
 from cyber_risk.services.narration import NarrationService
+from cyber_risk.services.summary import SummaryFigures, SummaryService
 
 logger = get_logger(__name__)
 
@@ -43,6 +44,7 @@ class ReportService:
         pack: DataPack,
         retriever: ControlRetriever,
         narration: NarrationService,
+        summary: SummaryService | None = None,
         kev_entries: dict[str, KevEntry] | None = None,
         manifest: SnapshotManifest | None = None,
     ) -> None:
@@ -50,6 +52,7 @@ class ReportService:
         self._pack = pack
         self._retriever = retriever
         self._narration = narration
+        self._summary = summary
         self._kev = kev_entries or {}
         self._manifest = manifest
         self._cached: RiskReport | None = None
@@ -60,6 +63,7 @@ class ReportService:
         settings: Settings,
         retriever: ControlRetriever,
         narration: NarrationService,
+        summary: SummaryService | None = None,
     ) -> ReportService:
         """Build a service by loading everything from configured locations."""
         reference_dir = settings.resolve_path(settings.data_reference_dir)
@@ -68,6 +72,7 @@ class ReportService:
             pack=DataPack.load(settings.resolve_path(settings.data_raw_dir)),
             retriever=retriever,
             narration=narration,
+            summary=summary,
             kev_entries=load_kev_snapshot(reference_dir),
             manifest=load_manifest(reference_dir),
         )
@@ -111,9 +116,20 @@ class ReportService:
             )
         )
 
+        quality = assess_quality(self._pack)
+        figures = SummaryFigures(
+            entries, quality, len(self._pack.vulnerabilities), len(self._pack.assets)
+        )
+        summary = (
+            await self._summary.summarise(figures)
+            if self._summary is not None
+            else ""
+        )
+
         report = RiskReport(
             entries=entries,
-            quality=assess_quality(self._pack),
+            summary=summary,
+            quality=quality,
             provenance=self._provenance(provider),
             total_findings=len(self._pack.vulnerabilities),
             total_assets=len(self._pack.assets),

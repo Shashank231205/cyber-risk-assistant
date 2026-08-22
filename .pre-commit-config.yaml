@@ -1,0 +1,42 @@
+# Runs the same gates as CI, before a commit is made rather than after.
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-added-large-files
+        args: [--maxkb=2048]
+      - id: check-merge-conflict
+      - id: check-toml
+      - id: check-yaml
+      - id: detect-private-key
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: trailing-whitespace
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.4
+    hooks:
+      - id: ruff
+        args: [--fix]
+
+  - repo: https://github.com/psf/black
+    rev: 26.5.1
+    hooks:
+      - id: black
+
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy
+        entry: mypy
+        language: system
+        types: [python]
+        args: [src, scripts, main.py]
+        pass_filenames: false
+
+      - id: no-env-file
+        name: no environment file staged
+        entry: bash -c 'git diff --cached --name-only | grep -E "(^|/)\.env($|\.)" | grep -v "\.env\.example" && { echo "an environment file is staged"; exit 1; } || exit 0'
+        language: system
+        pass_filenames: false

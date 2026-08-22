@@ -48,15 +48,22 @@ class GeminiProvider:
 
     ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models"
 
-    def __init__(self, api_key: str, model: str, temperature: float) -> None:
+    def __init__(
+        self,
+        api_key: str,
+        model: str,
+        temperature: float,
+        label: str = "gemini",
+    ) -> None:
         self._api_key = api_key
         self._model = model
         self._temperature = temperature
+        self._label = label
 
     @property
     def name(self) -> str:
         """Identifier used in logs and in the report's provenance line."""
-        return f"gemini:{self._model}"
+        return f"{self._label}:{self._model}"
 
     async def generate(self, system: str, prompt: str) -> str:
         """Return generated text, or raise if this provider cannot serve."""
@@ -199,7 +206,18 @@ def build_providers(settings: Settings) -> tuple[LLMProvider, ...]:
         model = settings.model_name_for(choice)
 
         if choice is LLMProviderName.GEMINI:
-            providers.append(GeminiProvider(secret, model, settings.llm_temperature))
+            # One provider per credential. Free-tier quota is counted per key,
+            # so exhausting the first is worth retrying on the second before
+            # falling to a different provider and a different model's wording.
+            providers.extend(
+                GeminiProvider(
+                    credential.get_secret_value(),
+                    model,
+                    settings.llm_temperature,
+                    label="gemini" if position == 0 else f"gemini-{position + 1}",
+                )
+                for position, credential in enumerate(settings.gemini_keys)
+            )
         elif choice is LLMProviderName.GROQ:
             providers.append(
                 OpenAICompatibleProvider(
