@@ -40,14 +40,11 @@ dev = [
     "tomli>=2.0.1; python_version < '3.11'",
 ]
 
-[project.scripts]
-cyber-risk = "cyber_risk.cli:main"
-
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-cyber_risk = ["py.typed", "prompts/*.md", "api/templates/*.html"]
+cyber_risk = ["py.typed", "prompts/*.md"]
 
 # ---------------------------------------------------------------------------
 # Ruff -- lint + format
@@ -88,6 +85,9 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101", "S105", "S106", "D100", "D101", "D102", "D103", "ARG001", "ARG002"]
 "scripts/**" = ["T201"]  # scripts are CLIs; stdout is their interface
+# Depends() in a default is how FastAPI declares a dependency, and handler
+# signatures must accept request/exc whether or not the body uses them.
+"src/cyber_risk/api/app.py" = ["B008", "ARG001"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
