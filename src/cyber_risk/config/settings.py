@@ -118,11 +118,11 @@ class Settings(BaseSettings):
         LLMProviderName.OPENROUTER,
     )
     gemini_api_key: SecretStr | None = None
-    gemini_model: str = "gemini-2.0-flash"
+    gemini_model: str = "gemini-3.5-flash-lite"
     groq_api_key: SecretStr | None = None
-    groq_model: str = "llama-3.3-70b-versatile"
+    groq_model: str = "openai/gpt-oss-120b"
     openrouter_api_key: SecretStr | None = None
-    openrouter_model: str = "meta-llama/llama-3.3-70b-instruct:free"
+    openrouter_model: str = "google/gemma-4-31b-it:free"
 
     llm_timeout_seconds: float = Field(default=30.0, gt=0.0, le=300.0)
     llm_max_retries: int = Field(default=2, ge=0, le=10)

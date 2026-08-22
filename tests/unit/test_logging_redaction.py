@@ -121,3 +121,31 @@ class TestProcessorRobustness:
     def test_tuple_type_is_preserved(self) -> None:
         result = redact({"items": ("a", "b")})
         assert isinstance(result["items"], tuple)
+
+
+@pytest.mark.unit
+class TestProviderKeyFormats:
+    """Every credential format the configured providers issue must be caught.
+
+    A pattern that covers only one vendor format is a silent gap: the key
+    still reaches the log, and nothing fails to signal it.
+    """
+
+    @pytest.mark.parametrize(
+        ("provider", "sample"),
+        [
+            ("gemini-legacy", "AIzaSyD1234567890abcdefghijklmnop"),
+            ("gemini-current", "AQ.Ab8RN6IuvQ1234567890abcdefghijklmnop"),
+            ("groq", "gsk_1234567890abcdefghijklmnop"),
+            ("openrouter", "sk-or-v1-1234567890abcdefghijklmnop"),
+        ],
+    )
+    def test_key_in_free_text_is_scrubbed(self, provider: str, sample: str) -> None:
+        result = str(redact({"event": f"call to {provider} failed using {sample}"}))
+        assert sample not in result
+        assert REDACTED in result
+
+    def test_ordinary_text_is_not_over_redacted(self) -> None:
+        """Redaction must not damage legitimate values such as control IDs."""
+        event = {"event": "retrieved control SI-2 for CVE-2024-21762"}
+        assert redact(event) == event

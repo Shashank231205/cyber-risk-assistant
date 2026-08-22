@@ -65,10 +65,17 @@ IDENTIFIER_KEYS: Final[frozenset[str]] = frozenset(
 )
 
 _BEARER_PATTERN: Final[re.Pattern[str]] = re.compile(
-    r"(bearer\s+)[A-Za-z0-9._\-]{8,}", re.IGNORECASE
+    r"(bearer\s+)[A-Za-z0-9._-]{8,}", re.IGNORECASE
 )
+#: Credential shapes issued by the providers this system calls. Google issues
+#: both the legacy ``AIza`` format and the newer ``AQ.`` format, so a pattern
+#: covering only the former would let a live key reach the logs.
 _API_KEY_PATTERN: Final[re.Pattern[str]] = re.compile(
-    r"\b(AIza[A-Za-z0-9._\-]{10,}|gsk_[A-Za-z0-9]{10,}|sk-[A-Za-z0-9._\-]{10,})\b"
+    r"(AIza[A-Za-z0-9._-]{10,}"
+    r"|AQ\.[A-Za-z0-9._-]{10,}"
+    r"|gsk_[A-Za-z0-9]{10,}"
+    r"|sk-or-v1-[A-Za-z0-9._-]{10,}"
+    r"|sk-[A-Za-z0-9._-]{10,})"
 )
 
 
