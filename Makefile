@@ -43,7 +43,8 @@ typecheck: ## Run strict type checking
 
 security: ## Run security linting and dependency auditing
 	$(BIN)/python -m bandit -q -c pyproject.toml -r src scripts
-	$(BIN)/python -m pip_audit --strict --ignore-vuln GHSA-4xh5-x5gv-qwph || true
+	$(BIN)/python -m pip_audit --strict -r requirements.txt
+	$(BIN)/python -m pip_audit --strict -r requirements-dev.txt
 
 format: ## Apply automatic formatting
 	$(BIN)/python -m ruff check --fix src tests scripts main.py

@@ -43,8 +43,14 @@ jobs:
       - name: Security lint
         run: bandit -q -c pyproject.toml -r src scripts
 
+      # Audit the declared dependencies rather than the environment. Auditing
+      # the environment also inspects this project, which is installed from
+      # source and has no PyPI entry, and under --strict an unauditable
+      # package fails the run.
       - name: Audit dependencies
-        run: pip-audit --strict
+        run: |
+          pip-audit --strict -r requirements.txt
+          pip-audit --strict -r requirements-dev.txt
 
       - name: Requirement files are current
         run: python scripts/sync_requirements.py --check
