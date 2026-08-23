@@ -1,13 +1,20 @@
 #!/usr/bin/env python3
-"""Regenerate pinned requirement files from ``pyproject.toml``.
+"""Regenerate the requirement files from ``pyproject.toml``.
 
 ``pyproject.toml`` is the single source of truth for dependencies. Plain
-requirement files are still needed for platforms that build from them
+requirement files are still needed for platforms that install from them
 directly, so they are generated rather than hand-maintained: a duplicated
 dependency list edited by hand drifts out of sync silently.
 
-Pins are taken from the versions actually resolved in the current
-environment, which makes container and CI builds reproducible.
+The generated files mirror the constraints declared in ``pyproject.toml``
+rather than the versions resolved in whichever environment ran this script.
+Resolved versions differ between interpreters and platforms, so writing them
+here would make the file's contents depend on where it was generated, and the
+``--check`` mode could then never pass on more than one environment at a time.
+
+These files are therefore a convenience mirror, not a lock file. Reproducible
+installs down to the transitive tree need a resolver that records hashes; what
+is guaranteed here is only that the two dependency lists agree.
 
 Usage:
     python scripts/sync_requirements.py           # write the files
@@ -18,7 +25,6 @@ from __future__ import annotations
 
 import argparse
 import sys
-from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
 if sys.version_info >= (3, 11):
@@ -38,63 +44,18 @@ HEADER = (
 )
 
 
-def _split_requirement(spec: str) -> tuple[str, str, str]:
-    """Split a requirement spec into distribution name, extras and marker.
-
-    The environment marker must be preserved: dropping it would install
-    conditional dependencies on interpreters that do not need them.
-    """
-    requirement, _, marker = spec.partition(";")
-    head = requirement.split(">=")[0].split("==")[0].split("~=")[0].strip()
-
-    extras = ""
-    if "[" in head:
-        head, _, remainder = head.partition("[")
-        extras = f"[{remainder.rstrip(']')}]"
-
-    return head.strip(), extras, marker.strip()
-
-
-def _pin(spec: str) -> str:
-    """Pin a requirement spec to the version installed in this environment.
-
-    A dependency carrying an environment marker is emitted unpinned. Such a
-    dependency is installed on some interpreters and not others, so pinning it
-    from whatever happens to be present would make this file's contents depend
-    on the interpreter that generated it, and the --check mode could then never
-    pass on more than one version at a time.
-    """
-    name, extras, marker = _split_requirement(spec)
-    if marker:
-        return f"{name}{extras}; {marker}"
-
-    try:
-        resolved = version(name)
-    except PackageNotFoundError:
-        print(
-            f"error: {name!r} is declared in pyproject.toml but is not installed. "
-            "Run `pip install -e '.[dev]'` first.",
-            file=sys.stderr,
-        )
-        raise SystemExit(1) from None
-
-    return f"{name}{extras}=={resolved}"
-
-
 def _render() -> tuple[str, str]:
-    """Return the rendered contents of the runtime and dev requirement files."""
+    """Return the contents of the runtime and development requirement files."""
     project = tomllib.loads(PYPROJECT.read_text(encoding="utf-8"))["project"]
 
-    runtime = sorted(_pin(dep) for dep in project["dependencies"])
-    dev = sorted(_pin(dep) for dep in project["optional-dependencies"]["dev"])
+    runtime = sorted(project["dependencies"], key=str.lower)
+    development = sorted(project["optional-dependencies"]["dev"], key=str.lower)
 
-    runtime_text = HEADER.format(title="Runtime dependencies: pinned for reproducible builds.")
+    runtime_text = HEADER.format(title="Runtime dependencies.")
     runtime_text += "\n".join(runtime) + "\n"
 
-    dev_text = HEADER.format(
-        title="Development and CI dependencies: pinned for reproducible builds."
-    )
-    dev_text += "-r requirements.txt\n" + "\n".join(dev) + "\n"
+    dev_text = HEADER.format(title="Development and continuous integration dependencies.")
+    dev_text += "-r requirements.txt\n" + "\n".join(development) + "\n"
 
     return runtime_text, dev_text
 

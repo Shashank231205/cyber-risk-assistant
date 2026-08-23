@@ -1,13 +1,13 @@
-# Development and CI dependencies: pinned for reproducible builds.
+# Development and continuous integration dependencies.
 # Generated from pyproject.toml by scripts/sync_requirements.py; do not edit by hand.
 -r requirements.txt
-bandit[toml]==1.9.4
-black==26.5.1
-mypy==2.3.1
-pip-audit==2.10.1
-pre-commit==4.6.2
-pytest-asyncio==1.4.0
-pytest-cov==7.1.0
-pytest==9.1.1
-ruff==0.16.4
-tomli; python_version < '3.11'
+bandit[toml]>=1.7.10
+black>=24.10.0
+mypy>=1.13.0
+pip-audit>=2.7.3
+pre-commit>=4.0.0
+pytest-asyncio>=0.24.0
+pytest-cov>=6.0.0
+pytest>=8.3.0
+ruff>=0.7.0
+tomli>=2.0.1; python_version < '3.11'
