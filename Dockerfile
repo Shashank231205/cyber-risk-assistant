@@ -34,11 +34,18 @@ FROM python:3.12-slim AS runtime
 RUN groupadd --system --gid 1001 app \
     && useradd --system --uid 1001 --gid app --no-create-home --shell /usr/sbin/nologin app
 
+# Data locations are absolute. The package is installed into the environment
+# rather than run from the source tree, so a path derived from the source
+# layout does not resolve here.
 ENV PATH="/opt/venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     APP_ENV=production \
-    FASTEMBED_CACHE_PATH=/opt/models
+    FASTEMBED_CACHE_PATH=/opt/models \
+    DATA_RAW_DIR=/app/data/raw \
+    DATA_REFERENCE_DIR=/app/data/reference \
+    DATA_OUTPUT_DIR=/app/data/outputs \
+    VECTOR_INDEX_PATH=/app/data/processed/nist_index
 
 WORKDIR /app
 
@@ -57,4 +64,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
     CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4).status == 200 else 1)"
 
 # Shell form so the platform-provided PORT is honoured where one is set.
-CMD exec uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --log-config=/dev/null
+CMD exec uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}

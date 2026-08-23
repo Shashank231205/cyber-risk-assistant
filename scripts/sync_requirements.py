@@ -56,15 +56,21 @@ def _split_requirement(spec: str) -> tuple[str, str, str]:
 
 
 def _pin(spec: str) -> str:
-    """Pin a requirement spec to the version installed in this environment."""
+    """Pin a requirement spec to the version installed in this environment.
+
+    A dependency carrying an environment marker is emitted unpinned. Such a
+    dependency is installed on some interpreters and not others, so pinning it
+    from whatever happens to be present would make this file's contents depend
+    on the interpreter that generated it, and the --check mode could then never
+    pass on more than one version at a time.
+    """
     name, extras, marker = _split_requirement(spec)
+    if marker:
+        return f"{name}{extras}; {marker}"
+
     try:
         resolved = version(name)
     except PackageNotFoundError:
-        if marker:
-            # Conditional dependency that does not apply to this interpreter;
-            # emit it unpinned so it still resolves where the marker matches.
-            return f"{name}{extras}; {marker}"
         print(
             f"error: {name!r} is declared in pyproject.toml but is not installed. "
             "Run `pip install -e '.[dev]'` first.",
@@ -72,8 +78,7 @@ def _pin(spec: str) -> str:
         )
         raise SystemExit(1) from None
 
-    pinned = f"{name}{extras}=={resolved}"
-    return f"{pinned}; {marker}" if marker else pinned
+    return f"{name}{extras}=={resolved}"
 
 
 def _render() -> tuple[str, str]:
