@@ -1,5 +1,5 @@
 # Two stages so build tooling and caches never reach the runtime image.
-FROM python:3.12-slim AS builder
+FROM python:3.14-slim AS builder
 
 ENV PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
@@ -28,7 +28,7 @@ RUN /opt/venv/bin/python scripts/fetch_reference_data.py --verify \
     && /opt/venv/bin/python scripts/build_index.py --verify
 
 
-FROM python:3.12-slim AS runtime
+FROM python:3.14-slim AS runtime
 
 # A non-root user with no shell: nothing in the container needs to log in.
 RUN groupadd --system --gid 1001 app \
