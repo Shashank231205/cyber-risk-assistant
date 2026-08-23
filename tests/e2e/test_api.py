@@ -215,3 +215,31 @@ class TestDisclosure:
 
         assert "Traceback" not in body
         assert "cyber_risk" not in body
+
+
+class TestScoreBars:
+    """The factor bars are the page's explanation of the score."""
+
+    def test_bars_render_with_a_width(self, client: TestClient) -> None:
+        """A bar with no width shows the reader nothing."""
+        import re
+
+        fills = re.findall(r'<span class="fill [a-z]*" style="width:(\d+)%"', client.get("/").text)
+
+        assert fills, "no score bars were rendered"
+        assert any(int(width) > 0 for width in fills)
+
+    def test_fill_is_a_block_so_its_height_applies(self, client: TestClient) -> None:
+        """Regression: an inline fill ignores its height and renders empty."""
+        assert "display: block" in client.get("/").text
+
+    def test_each_factor_has_its_own_colour(self, client: TestClient) -> None:
+        """The same factor keeps one colour, so two risks can be compared."""
+        import re
+
+        classes = set(re.findall(r'<span class="fill ([a-z]+)"', client.get("/").text))
+        assert classes == {"exposure", "exploit", "business", "ransomware", "controls"}
+
+    def test_motion_is_optional(self, client: TestClient) -> None:
+        """Animation must not be forced on a reader who has asked for less."""
+        assert "prefers-reduced-motion" in client.get("/").text

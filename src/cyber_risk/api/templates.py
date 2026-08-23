@@ -22,12 +22,16 @@ STYLES = """
   --bg: #f7f7f6; --panel: #fff; --ink: #1c1b1a; --muted: #5f5c58;
   --line: #e3e0dc; --accent: #8a3a2b; --chip: #f0ede9;
   --critical: #9a2b20; --warning: #8a6314; --info: #4a5a6a;
+  --f-exposure: #b0442f; --f-exploit: #a8623a; --f-business: #6a6a3c;
+  --f-ransomware: #8a3a52; --f-controls: #4a6a72;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #191817; --panel: #211f1e; --ink: #eceae7; --muted: #a8a39d;
     --line: #35322f; --accent: #d98570; --chip: #2b2927;
     --critical: #e08a7d; --warning: #d4ad63; --info: #90a4b8;
+    --f-exposure: #e0876c; --f-exploit: #d9a172; --f-business: #b8b878;
+    --f-ransomware: #d98098; --f-controls: #85aab5;
   }
 }
 * { box-sizing: border-box; }
@@ -72,8 +76,22 @@ dd { margin: 0; }
 .bars { margin: 0 0 18px; }
 .bar-row { display: grid; grid-template-columns: minmax(130px, auto) 1fr auto;
            gap: 10px; align-items: center; font-size: 0.83rem; margin-bottom: 5px; }
-.track { background: var(--chip); border-radius: 3px; height: 7px; overflow: hidden; }
-.fill { background: var(--accent); height: 100%; }
+.track { background: var(--chip); border-radius: 4px; height: 8px; overflow: hidden; }
+/* Block, not inline: a height has no effect on an inline box, so an inline
+   fill renders as an empty track. */
+.fill { display: block; height: 100%; border-radius: 4px;
+        animation: grow 700ms cubic-bezier(0.22, 0.61, 0.36, 1) both; }
+/* Each factor keeps its own hue across every risk, so a reader comparing two
+   entries can see at a glance which one is driven by exposure and which by
+   missing controls. */
+.fill.exposure    { background: var(--f-exposure); }
+.fill.exploit     { background: var(--f-exploit); }
+.fill.business    { background: var(--f-business); }
+.fill.ransomware  { background: var(--f-ransomware); }
+.fill.controls    { background: var(--f-controls); }
+@keyframes grow { from { transform: scaleX(0); transform-origin: left; }
+                  to   { transform: scaleX(1); transform-origin: left; } }
+@media (prefers-reduced-motion: reduce) { .fill { animation: none; } }
 .pts { color: var(--muted); font-variant-numeric: tabular-nums; }
 .control { border-top: 1px solid var(--line); padding-top: 16px; }
 .control h3 + blockquote { margin-bottom: 14px; }
@@ -103,6 +121,16 @@ table { width: 100%; border-collapse: collapse; }
 }
 """
 
+#: A stable colour per scoring factor, so the same factor looks the same on
+#: every risk and two entries can be compared at a glance.
+FACTOR_CLASSES = {
+    "Internet exposure": "exposure",
+    "Active exploitation": "exploit",
+    "Business criticality": "business",
+    "Ransomware association": "ransomware",
+    "Missing controls": "controls",
+}
+
 SEVERITY_LABELS = {
     DataQualitySeverity.CRITICAL: "Critical",
     DataQualitySeverity.WARNING: "Warning",
@@ -118,8 +146,8 @@ def _risk_section(entry: RiskEntry) -> str:
 
     rows = "".join(
         f'<div class="bar-row"><span>{escape(f.name)}</span>'
-        f'<span class="track"><span class="fill" style="width:{f.contribution / largest:.0%}">'
-        f"</span></span>"
+        f'<span class="track"><span class="fill {FACTOR_CLASSES.get(f.name, "")}" '
+        f'style="width:{f.contribution / largest:.0%}"></span></span>'
         f'<span class="pts">{f.contribution:.1f}</span></div>'
         for f in breakdown.ranked_factors
         if f.contribution > 0
