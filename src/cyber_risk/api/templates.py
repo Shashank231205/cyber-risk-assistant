@@ -76,6 +76,7 @@ dd { margin: 0; }
 .fill { background: var(--accent); height: 100%; }
 .pts { color: var(--muted); font-variant-numeric: tabular-nums; }
 .control { border-top: 1px solid var(--line); padding-top: 16px; }
+.control h3 + blockquote { margin-bottom: 14px; }
 .control h3 { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.09em;
               color: var(--muted); margin: 0 0 8px; }
 .control p { margin: 0 0 8px; font-weight: 600; font-size: 0.94rem; }
@@ -170,10 +171,18 @@ def _risk_section(entry: RiskEntry) -> str:
         control = entry.control
         flag = '<span class="flag">indicative match</span>' if control.is_weak_match else ""
         guidance = (
-            '<div class="control"><h3>Recommended control</h3>'
+            '<div class="control"><h3>Fix it</h3>'
             f"<p>{escape(control.citation)}{flag}</p>"
-            f"<blockquote>{escape(control.excerpt)}</blockquote></div>"
+            f"<blockquote>{escape(control.excerpt)}</blockquote>"
         )
+        if entry.supporting_control is not None:
+            support = entry.supporting_control
+            guidance += (
+                "<h3>Contain it</h3>"
+                f"<p>{escape(support.citation)}</p>"
+                f"<blockquote>{escape(support.excerpt)}</blockquote>"
+            )
+        guidance += "</div>"
     else:
         guidance = (
             '<div class="control"><h3>Recommended control</h3>'

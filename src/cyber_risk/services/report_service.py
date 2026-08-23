@@ -100,8 +100,9 @@ class ReportService:
         ranked = rank_risks(correlated, self._settings.weights)
         selected = select_top_risks(ranked, limit)
 
+        guidance = [(scored, *self._controls_for(scored)) for scored in selected]
         pairs: list[tuple[ScoredRisk, RetrievedControl | None]] = [
-            (scored, self._best_control(scored)) for scored in selected
+            (scored, primary) for scored, primary, _ in guidance
         ]
         narratives, provider = await self._narration.narrate(pairs)
 
@@ -109,11 +110,12 @@ class ReportService:
             RiskEntry(
                 position=position,
                 scored=scored,
-                control=control,
+                control=primary,
+                supporting_control=supporting,
                 narrative=narrative,
             )
-            for position, ((scored, control), narrative) in enumerate(
-                zip(pairs, narratives, strict=True), start=1
+            for position, ((scored, primary, supporting), narrative) in enumerate(
+                zip(guidance, narratives, strict=True), start=1
             )
         )
 
@@ -144,22 +146,23 @@ class ReportService:
         )
         return report
 
-    def _best_control(self, scored: ScoredRisk) -> RetrievedControl | None:
-        """Retrieve the most applicable control, tolerating retrieval failure.
+    def _controls_for(
+        self, scored: ScoredRisk
+    ) -> tuple[RetrievedControl | None, RetrievedControl | None]:
+        """Retrieve the governing and supporting controls for one risk.
 
         A retrieval problem must not cost the reader the ranking, so the entry
         is presented without guidance rather than not at all.
         """
         try:
-            results = self._retriever.retrieve(scored.risk, limit=1)
+            return self._retriever.retrieve_with_support(scored.risk)
         except Exception as error:
             logger.warning(
                 "guidance retrieval failed for one risk",
                 risk_id=scored.risk.risk_id,
                 reason=type(error).__name__,
             )
-            return None
-        return results[0] if results else None
+            return None, None
 
     def _provenance(self, provider: str | None) -> ReportProvenance:
         """Record where this report's inputs came from."""

@@ -68,11 +68,21 @@ def render_entry(entry: RiskEntry) -> str:
         lines.extend(
             [
                 "",
-                f"**Recommended control**: {control.citation}{confidence}",
+                f"**Fix it**: {control.citation}{confidence}",
                 "",
                 f"> {control.excerpt}",
             ]
         )
+        if entry.supporting_control is not None:
+            support = entry.supporting_control
+            lines.extend(
+                [
+                    "",
+                    f"**Contain it**: {support.citation}",
+                    "",
+                    f"> {support.excerpt}",
+                ]
+            )
     else:
         lines.extend(["", "**Recommended control**: none retrieved for this finding."])
 

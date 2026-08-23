@@ -30,6 +30,7 @@ class RiskEntry(BaseModel):
     position: int = Field(ge=1)
     scored: ScoredRisk
     control: RetrievedControl | None
+    supporting_control: RetrievedControl | None = None
     narrative: RiskNarrative
 
     @property

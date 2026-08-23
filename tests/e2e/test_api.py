@@ -193,7 +193,13 @@ class TestMarkdownReport:
         body = client.get("/report.md").text
 
         assert body.startswith("# Cyber Risk Briefing")
-        assert "**Recommended control**" in body
+        assert "**Fix it**" in body
+        assert "NIST SP 800-53" in body
+
+    def test_markdown_separates_fixing_from_containing(self, client: TestClient) -> None:
+        """One control says how to remove the flaw, another how to limit its use."""
+        body = client.get("/report.md").text
+        assert "**Contain it**" in body
 
 
 class TestDisclosure:

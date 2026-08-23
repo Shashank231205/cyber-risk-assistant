@@ -73,6 +73,7 @@ class RiskResponse(BaseModel):
     exposure_conflict: bool
     factors: tuple[FactorResponse, ...]
     control: ControlResponse | None
+    supporting_control: ControlResponse | None
 
     @classmethod
     def from_entry(cls, entry: RiskEntry) -> RiskResponse:
@@ -111,6 +112,7 @@ class RiskResponse(BaseModel):
                 for factor in entry.scored.breakdown.ranked_factors
                 if factor.contribution > 0
             ),
+            supporting_control=_control_response(entry.supporting_control),
             control=(
                 ControlResponse(
                     control_id=control.control_id,
@@ -125,6 +127,21 @@ class RiskResponse(BaseModel):
                 else None
             ),
         )
+
+
+def _control_response(control: object | None) -> ControlResponse | None:
+    """Project a retrieved control onto the public shape, if there is one."""
+    if control is None:
+        return None
+    return ControlResponse(
+        control_id=control.control_id,  # type: ignore[attr-defined]
+        title=control.title,  # type: ignore[attr-defined]
+        family=control.family,  # type: ignore[attr-defined]
+        excerpt=control.excerpt,  # type: ignore[attr-defined]
+        citation=control.citation,  # type: ignore[attr-defined]
+        similarity=round(control.score, 3),  # type: ignore[attr-defined]
+        is_weak_match=control.is_weak_match,  # type: ignore[attr-defined]
+    )
 
 
 class QualityIssueResponse(BaseModel):

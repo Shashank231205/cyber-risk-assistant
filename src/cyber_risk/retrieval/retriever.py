@@ -132,6 +132,59 @@ def build_query(risk: CorrelatedRisk) -> str:
     return ". ".join(parts)
 
 
+def build_containment_query(risk: CorrelatedRisk) -> str:
+    """Describe how this risk should be contained, rather than fixed.
+
+    The remediation query is dominated by patching language, so for a list of
+    unpatched flaws it correctly returns the same control every time. This
+    second query asks the other half of the question, which is what makes one
+    risk's response differ from another's: how to contain the exposure, detect
+    its use, or recover from it.
+    """
+    parts: list[str] = []
+
+    if risk.ransomware_linked:
+        parts.append(
+            "Incident handling for ransomware, system backup and recovery, "
+            "contingency planning and information system restoration"
+        )
+
+    if risk.is_internet_facing:
+        parts.append(
+            "Boundary protection, deny network traffic by default, isolate an "
+            "externally reachable component from internal systems"
+        )
+
+    if not risk.asset.edr_installed:
+        parts.append(
+            "System monitoring, detect malicious code and unauthorised activity "
+            "on a host, audit and accountability"
+        )
+
+    if not risk.vulnerability.auth_required:
+        parts.append(
+            "Access enforcement, least privilege, multifactor identification "
+            "and authentication of users"
+        )
+
+    if not risk.vulnerability.patch_available:
+        parts.append(
+            "Unsupported system components, alternative sources of support, "
+            "compensating controls where no patch exists"
+        )
+
+    if not risk.asset.has_owner:
+        parts.append("System ownership, responsibility assignment, personnel accountability")
+
+    if not parts:
+        parts.append(
+            "Configuration management, least functionality, and continuous "
+            "monitoring of the system baseline"
+        )
+
+    return ". ".join(parts)
+
+
 class ControlRetriever:
     """Retrieves catalogue guidance for a risk.
 
@@ -165,6 +218,32 @@ class ControlRetriever:
     ) -> tuple[RetrievedControl, ...]:
         """Retrieve the most applicable controls for ``risk``."""
         return self.retrieve_for_query(build_query(risk), limit)
+
+    def retrieve_with_support(
+        self, risk: CorrelatedRisk
+    ) -> tuple[RetrievedControl | None, RetrievedControl | None]:
+        """Return the governing control and a supporting one from another family.
+
+        Most unpatched flaws are governed by the same control, so a list of five
+        risks can correctly recommend the same remediation five times. That is
+        accurate but tells a reader little beyond "patch it". The supporting
+        control is the best match from a different control family, which is
+        where the rest of the response lives: containing the exposure,
+        monitoring for use of it, or recovering from it.
+        """
+        remediation = self.retrieve_for_query(build_query(risk), limit=1)
+        if not remediation:
+            return None, None
+
+        primary = remediation[0]
+        primary_family = _family_of(primary.control_id)
+
+        containment = self.retrieve_for_query(build_containment_query(risk), limit=4)
+        supporting = next(
+            (c for c in containment if _family_of(c.control_id) != primary_family),
+            None,
+        )
+        return primary, supporting
 
     def retrieve_for_query(
         self, query: str, limit: int | None = None
@@ -206,6 +285,15 @@ class ControlRetriever:
             )
 
         return tuple(results)
+
+
+def _family_of(control_id: str) -> str:
+    """The control family an identifier belongs to, such as ``SI`` or ``SC``.
+
+    Enhancements share their parent's family, so ``SI-2.2`` and ``SI-2`` are
+    the same family and do not count as different guidance.
+    """
+    return control_id.split("-", 1)[0].upper()
 
 
 def _prefer_base_controls(

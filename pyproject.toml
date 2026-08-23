@@ -92,7 +92,10 @@ convention = "google"
 
 # mypy: strict
 [tool.mypy]
-python_version = "3.10"
+# No python_version pin. Third-party stubs are written for the interpreter they
+# ship on, so forcing an older target makes mypy fail parsing them rather than
+# find a real problem. The lowest supported version is covered instead by
+# running the type check inside the 3.10 test job.
 strict = true
 warn_unreachable = true
 warn_unused_ignores = true

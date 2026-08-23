@@ -91,6 +91,12 @@ jobs:
           python scripts/build_index.py
           python scripts/build_index.py --verify
 
+      # Run against the lowest supported interpreter as well, so syntax or
+      # typing that only works on a newer version is caught here rather than
+      # by a user on 3.10.
+      - name: Type check on this interpreter
+        run: mypy src scripts main.py
+
       # No API keys are configured, so narration takes the deterministic path
       # and the suite makes no calls to a language provider.
       - name: Test
