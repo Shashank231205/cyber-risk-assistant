@@ -15,8 +15,10 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from cyber_risk.models.narrative import RiskNarrative
 from cyber_risk.models.quality import DataQualityReport
 from cyber_risk.models.risk import ScoredRisk
+from cyber_risk.models.summary import ExecutiveSummary
 from cyber_risk.retrieval.retriever import RetrievedControl
 
 
@@ -28,7 +30,7 @@ class RiskEntry(BaseModel):
     position: int = Field(ge=1)
     scored: ScoredRisk
     control: RetrievedControl | None
-    narrative: str
+    narrative: RiskNarrative
 
     @property
     def asset_name(self) -> str:
@@ -98,7 +100,7 @@ class RiskReport(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     entries: tuple[RiskEntry, ...]
-    summary: str = ""
+    summary: ExecutiveSummary = ExecutiveSummary()
     quality: DataQualityReport
     provenance: ReportProvenance
     total_findings: int = Field(ge=0)

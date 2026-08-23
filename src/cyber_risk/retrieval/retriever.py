@@ -2,9 +2,9 @@
 
 The query put to the index is built from what the system established about a
 risk, not from the vulnerability title alone. A title names a product; the
-control that answers it describes an activity. Describing the situation -- an
+control that answers it describes an activity. Describing the situation, an
 unpatched internet-facing flaw under active exploitation with no endpoint
-monitoring -- retrieves the control that addresses it.
+monitoring, retrieves the control that addresses it.
 
 Retrieved guidance is always attributed. Each result carries the control
 identifier, its title, the text it was matched on and the similarity score,

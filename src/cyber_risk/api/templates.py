@@ -60,7 +60,11 @@ h1 { font-size: 1.85rem; margin: 0 0 6px; letter-spacing: -0.02em; }
 .score { font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
 .score small { display: block; font-weight: 400; font-size: 0.7rem;
                color: var(--muted); text-align: right; }
-.narrative { margin: 0 0 18px; }
+.narrative { margin: 0 0 12px; }
+.points { list-style: none; padding: 0; margin: 0 0 18px; }
+.points li { padding: 7px 0 7px 14px; border-left: 2px solid var(--line);
+             margin-bottom: 4px; font-size: 0.92rem; }
+.points strong { color: var(--muted); font-weight: 600; }
 dl { display: grid; grid-template-columns: minmax(120px, auto) 1fr; gap: 6px 18px;
      margin: 0 0 18px; font-size: 0.9rem; }
 dt { color: var(--muted); }
@@ -151,6 +155,17 @@ def _risk_section(entry: RiskEntry) -> str:
         f"<dt>{escape(label)}</dt><dd>{escape(str(value))}</dd>" for label, value in details
     )
 
+    points = (
+        '<ul class="points">'
+        + "".join(
+            f"<li><strong>{escape(label)}.</strong> {escape(text)}</li>"
+            for label, text in entry.narrative.points
+        )
+        + "</ul>"
+        if entry.narrative.points
+        else ""
+    )
+
     if entry.control is not None:
         control = entry.control
         flag = '<span class="flag">indicative match</span>' if control.is_weak_match else ""
@@ -170,7 +185,8 @@ def _risk_section(entry: RiskEntry) -> str:
         f'<div class="risk-head"><span class="rank">{entry.position}</span>'
         f"<h2>{escape(entry.finding_name)}</h2>"
         f'<span class="score">{entry.scored.score:.1f}<small>of 100</small></span></div>'
-        f'<p class="narrative">{escape(entry.narrative)}</p>'
+        f'<p class="narrative">{escape(entry.narrative.assessment)}</p>'
+        f"{points}"
         f"<dl>{definitions}</dl>"
         f'<div class="bars">{rows}</div>'
         f"{guidance}"
@@ -182,10 +198,16 @@ def render_page(report: RiskReport) -> str:
     """Render the complete report as a self-contained HTML page."""
     provenance = report.provenance
 
+    summary_points = "".join(
+        f"<li><strong>{escape(label)}.</strong> {escape(text)}</li>"
+        for label, text in report.summary.points
+    )
     summary = (
-        f'<section class="summary"><h2>Summary for the board</h2>'
-        f"<p>{escape(report.summary)}</p></section>"
-        if report.summary
+        '<section class="summary"><h2>Summary for the board</h2>'
+        f"<p>{escape(report.summary.position)}</p>"
+        + (f'<ul class="points">{summary_points}</ul>' if summary_points else "")
+        + "</section>"
+        if report.summary.is_present
         else ""
     )
 

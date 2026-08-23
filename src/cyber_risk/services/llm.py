@@ -6,7 +6,7 @@ is handed to it already assembled. Its failure mode is therefore a less
 fluent sentence rather than a wrong ranking.
 
 Providers are tried in the configured order and the first that answers wins.
-When every provider is exhausted -- no key, rate limited, unreachable -- the
+When every provider is exhausted: no key, rate limited, unreachable: the
 caller falls back to deterministic narration, so the report is always
 produced. A free-tier key is exactly the kind of dependency that disappears
 during a demonstration, so it cannot be load-bearing.

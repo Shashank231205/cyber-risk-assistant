@@ -99,16 +99,16 @@ class Settings(BaseSettings):
         case_sensitive=False,
     )
 
-    # -- Application --------------------------------------------------------
+    # Application
     app_env: Environment = Environment.DEVELOPMENT
     log_level: str = "INFO"
     # Binding all interfaces is required inside a container, where the platform
-    # -- not the process -- controls what is reachable from outside. Suppressed
-    # for both scanners: ruff reports S104, bandit reports B104.
+    # rather than the process controls what is reachable from outside.
+    # Suppressed for both scanners: ruff reports S104, bandit reports B104.
     api_host: str = "0.0.0.0"  # noqa: S104  # nosec B104
     api_port: int = Field(default=8000, ge=1, le=65535)
 
-    # -- LLM provider chain -------------------------------------------------
+    # LLM provider chain
     # NoDecode keeps the settings source from JSON-decoding these values, so
     # the comma-separated form documented in .env.example reaches the
     # validator below instead of failing to parse at startup.
@@ -132,23 +132,23 @@ class Settings(BaseSettings):
     llm_max_retries: int = Field(default=2, ge=0, le=10)
     llm_temperature: float = Field(default=0.1, ge=0.0, le=2.0)
 
-    # -- Embeddings ---------------------------------------------------------
+    # Embeddings
     embedding_backend: EmbeddingBackendName = EmbeddingBackendName.LOCAL
     embedding_model: str = "BAAI/bge-small-en-v1.5"
     embedding_batch_size: int = Field(default=32, ge=1, le=512)
 
-    # -- Retrieval ----------------------------------------------------------
+    # Retrieval
     vector_backend: VectorBackendName = VectorBackendName.NUMPY
     vector_index_path: Path = Path("data/processed/nist_index")
     retrieval_top_k: int = Field(default=4, ge=1, le=25)
     retrieval_min_score: float = Field(default=0.30, ge=0.0, le=1.0)
 
-    # -- Data locations -----------------------------------------------------
+    # Data locations
     data_raw_dir: Path = Path("data/raw")
     data_reference_dir: Path = Path("data/reference")
     data_output_dir: Path = Path("data/outputs")
 
-    # -- Reference corpora --------------------------------------------------
+    # Reference corpora
     kev_source_url: str = (
         "https://raw.githubusercontent.com/cisagov/kev-data/main/"
         "known_exploited_vulnerabilities.csv"
@@ -158,11 +158,11 @@ class Settings(BaseSettings):
         "nist.gov/SP800-53/rev5/json/NIST_SP-800-53_rev5_catalog.json"
     )
 
-    # -- Risk model ---------------------------------------------------------
+    # Risk model
     risk_top_n: int = Field(default=5, ge=1, le=50)
     weights: RiskWeights = Field(default_factory=RiskWeights)
 
-    # -- Security -----------------------------------------------------------
+    # Security
     rate_limit_per_minute: int = Field(default=30, ge=1, le=10_000)
     cors_allowed_origins: Annotated[tuple[str, ...], NoDecode] = ("*",)
     demo_access_token: SecretStr | None = None

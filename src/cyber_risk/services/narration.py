@@ -6,12 +6,12 @@ to be rate limited; one call costs one of each.
 
 Narration is presentation. The ranking, the evidence and the retrieved control
 are settled before this module runs, and the deterministic fallback produces a
-complete report on its own. That is what keeps a rate-limited free tier from
-turning into a failed report.
+complete report on its own, so a rate-limited free tier costs wording rather
+than the report.
 
-Generated text is validated before use: a response with the wrong number of
-entries, or one that introduces a control identifier the evidence never
-mentioned, is discarded in favour of the deterministic version.
+Generated text is validated before use. A response with the wrong number of
+entries, or one introducing a control identifier the evidence never mentioned,
+is discarded in favour of the deterministic version.
 """
 
 from __future__ import annotations
@@ -20,6 +20,7 @@ import re
 from pathlib import Path
 
 from cyber_risk.core.logging import get_logger
+from cyber_risk.models.narrative import RiskNarrative
 from cyber_risk.models.risk import ScoredRisk
 from cyber_risk.retrieval.retriever import RetrievedControl
 from cyber_risk.services.llm import ProviderChain
@@ -28,12 +29,15 @@ logger = get_logger(__name__)
 
 PROMPT_PATH = Path(__file__).resolve().parent.parent / "prompts" / "narration.md"
 
-#: Matches a control identifier so generated text can be checked for
-#: references the supplied evidence never contained.
+# Matches a control identifier, so generated text can be checked for
+# references the supplied evidence never contained.
 _CONTROL_PATTERN = re.compile(r"\b[A-Z]{2}-\d{1,2}(?:\.\d{1,2})?\b")
 
-#: Matches the numbered lines the prompt asks for.
+# Matches the numbered lines the instructions ask for.
 _NUMBERED_LINE = re.compile(r"^\s*(\d+)\s*[:.]\s*(.+)$")
+
+# Field labels within a line, in the order the instructions specify.
+_FIELD_LABELS = ("ASSESSMENT", "THREAT", "IMPACT", "ACTION")
 
 
 def load_system_prompt() -> str:
@@ -44,8 +48,8 @@ def load_system_prompt() -> str:
 def describe_evidence(scored: ScoredRisk, control: RetrievedControl | None) -> str:
     """Render one risk as the evidence block handed to the model.
 
-    Only facts the system established are included. The model is given no room
-    to supply a detail because the detail was missing.
+    Only facts the system established are included, so the model has no room to
+    supply a detail because the detail was missing.
     """
     risk = scored.risk
     lines: list[str] = [
@@ -67,27 +71,10 @@ def describe_evidence(scored: ScoredRisk, control: RetrievedControl | None) -> s
     else:
         lines.append("Business service: not defined for this asset")
 
-    if risk.kev is not None:
-        lines.append(
-            "Public catalogue: confirmed exploited in the wild"
-            + (
-                ", used in ransomware campaigns"
-                if risk.kev.known_ransomware_campaign_use
-                else ""
-            )
-        )
-        if risk.kev.required_action:
-            lines.append(f"Catalogue required action: {risk.kev.required_action}")
-    elif not risk.vulnerability.is_catalogue_assessable:
-        lines.append(
-            "Public catalogue: not assessable, this identifier is assigned "
-            "internally and cannot be looked up"
-        )
-    else:
-        lines.append(
-            "Public catalogue: no entry found, which does not establish that it "
-            "is not exploited"
-        )
+    lines.append(_catalogue_line(risk))
+
+    if risk.kev is not None and risk.kev.required_action:
+        lines.append(f"Catalogue required action: {risk.kev.required_action}")
 
     if risk.campaign_names:
         actors = ", ".join(risk.threat_actors) if risk.threat_actors else "an unnamed group"
@@ -99,7 +86,7 @@ def describe_evidence(scored: ScoredRisk, control: RetrievedControl | None) -> s
         lines.append("Threat activity: no campaign in the feed references this finding")
 
     lines.append("Why it ranks here:")
-    lines.extend(f"  - {item}" for item in scored.breakdown.all_evidence)
+    lines.extend(f"  {item}" for item in scored.breakdown.all_evidence)
 
     if control is not None:
         lines.append(f"Applicable control: {control.control_id} {control.title}")
@@ -112,6 +99,27 @@ def describe_evidence(scored: ScoredRisk, control: RetrievedControl | None) -> s
     return "\n".join(lines)
 
 
+def _catalogue_line(risk: object) -> str:
+    """State what the public catalogue does and does not establish."""
+    kev = risk.kev  # type: ignore[attr-defined]
+    vulnerability = risk.vulnerability  # type: ignore[attr-defined]
+
+    if kev is not None:
+        suffix = ", used in ransomware campaigns" if kev.known_ransomware_campaign_use else ""
+        return f"Public catalogue: confirmed exploited in the wild{suffix}"
+
+    if not vulnerability.is_catalogue_assessable:
+        return (
+            "Public catalogue: not assessable, this identifier is assigned "
+            "internally and cannot be looked up"
+        )
+
+    return (
+        "Public catalogue: no entry found, which does not establish that it "
+        "is not exploited"
+    )
+
+
 def build_prompt(entries: list[tuple[ScoredRisk, RetrievedControl | None]]) -> str:
     """Assemble the single request covering every risk."""
     blocks = [
@@ -119,87 +127,146 @@ def build_prompt(entries: list[tuple[ScoredRisk, RetrievedControl | None]]) -> s
         for position, (scored, control) in enumerate(entries, start=1)
     ]
     return (
-        f"There are {len(entries)} risks. Write one paragraph for each.\n\n"
+        f"There are {len(entries)} risks. Produce one line for each.\n\n"
         + "\n\n".join(blocks)
     )
 
 
-def deterministic_narration(
+def deterministic_narrative(
     scored: ScoredRisk, control: RetrievedControl | None
-) -> str:
-    """Compose a paragraph from the evidence without a language model.
+) -> RiskNarrative:
+    """Compose the four fields from evidence, without a language model.
 
-    The report must be producible with no provider configured, so this is a
-    supported output rather than a degraded placeholder.
+    A supported output rather than a degraded placeholder: the report must be
+    producible with no provider configured.
     """
     risk = scored.risk
-    service = risk.service.business_service if risk.service else "an undefined service"
     reach = "reachable from the internet" if risk.is_internet_facing else "internal only"
 
-    sentences = [
-        f"{risk.asset.asset_name} is affected by "
-        f"{risk.vulnerability.vulnerability_name} ({risk.vulnerability.cve}), "
-        f"severity {risk.vulnerability.cvss} of 10, and is {reach}. "
-        f"It supports {service}."
-    ]
+    assessment = (
+        f"{risk.asset.asset_name} is a {risk.asset.environment.value.lower()} "
+        f"{risk.asset.asset_type.lower()} affected by "
+        f"{risk.vulnerability.vulnerability_name}, and is {reach}. "
+        f"It has been open for {risk.vulnerability.days_open} days at severity "
+        f"{risk.vulnerability.cvss} of 10."
+    )
 
-    if risk.kev is not None:
-        confirmation = "is confirmed exploited in the wild"
-        if risk.kev.known_ransomware_campaign_use:
-            confirmation += " and is used in ransomware campaigns"
-        sentences.append(f"This vulnerability {confirmation}.")
-    elif not risk.vulnerability.is_catalogue_assessable:
-        sentences.append(
-            "This finding carries an internally assigned identifier, so its "
-            "exploitation status could not be confirmed against the public catalogue."
-        )
+    threat = _deterministic_threat(scored)
+    impact = _deterministic_impact(scored)
+    action = (
+        f"{control.control_id} {control.title} applies: {control.excerpt}"
+        if control is not None
+        else "No control was retrieved for this finding."
+    )
+
+    return RiskNarrative(
+        assessment=assessment, threat=threat, impact=impact, action=action
+    )
+
+
+def _deterministic_threat(scored: ScoredRisk) -> str:
+    """State what is known about who is attacking this."""
+    risk = scored.risk
+    parts: list[str] = []
 
     if risk.campaign_names:
-        actors = ", ".join(risk.threat_actors) or "an unnamed group"
-        sentences.append(
-            f"It is referenced by campaign {', '.join(risk.campaign_names)}, "
-            f"attributed to {actors}."
+        actors = ", ".join(risk.threat_actors) or "an unattributed group"
+        parts.append(
+            f"Referenced by campaign {', '.join(risk.campaign_names)}, "
+            f"attributed to {actors}"
+        )
+    else:
+        parts.append("No campaign in the current feed references this finding")
+
+    if risk.kev is not None:
+        confirmation = "confirmed exploited in the wild"
+        if risk.kev.known_ransomware_campaign_use:
+            confirmation += " and used in ransomware campaigns"
+        parts.append(f"it is {confirmation}")
+    elif not risk.vulnerability.is_catalogue_assessable:
+        parts.append(
+            "its identifier is internal, so exploitation could not be confirmed "
+            "against the public catalogue"
         )
 
-    dominant = scored.breakdown.dominant_factor
-    if dominant is not None and dominant.evidence:
-        sentences.append(f"It ranks here mainly because: {dominant.evidence[0].lower()}")
-
-    if control is not None:
-        sentences.append(
-            f"{control.control_id} ({control.title}) applies: {control.excerpt}"
-        )
-
-    return " ".join(sentences)
+    return "; ".join(parts) + "."
 
 
-def _parse_response(text: str, expected: int) -> list[str] | None:
-    """Extract one paragraph per risk, or ``None`` if the shape is wrong."""
-    paragraphs: dict[int, str] = {}
+def _deterministic_impact(scored: ScoredRisk) -> str:
+    """State what stops working if this asset is compromised."""
+    service = scored.risk.service
+    if service is None:
+        return "No business service is defined for this asset, so impact is unknown."
+
+    sentence = f"Compromise affects {service.business_service}"
+    if service.business_impact:
+        sentence += f": {service.business_impact.rstrip('.')}"
+    if service.compliance_scope:
+        sentence += f", within {', '.join(service.compliance_scope)} scope"
+    if service.rto_hours:
+        sentence += f" and a {service.rto_hours}-hour recovery objective"
+    return sentence + "."
+
+
+def _parse_line(body: str) -> RiskNarrative | None:
+    """Split one response line into its four labelled fields."""
+    fields: dict[str, str] = {}
+
+    for segment in body.split("||"):
+        cleaned = segment.strip()
+        for label in _FIELD_LABELS:
+            prefix = f"{label}:"
+            if cleaned.upper().startswith(prefix):
+                fields[label] = cleaned[len(prefix) :].strip()
+                break
+
+    assessment = fields.get("ASSESSMENT", "").strip()
+    if not assessment:
+        # Without the leading assessment the entry has no opening sentence, so
+        # the whole line is unusable however good the remaining fields are.
+        return None
+
+    return RiskNarrative(
+        assessment=assessment,
+        threat=fields.get("THREAT", "").strip(),
+        impact=fields.get("IMPACT", "").strip(),
+        action=fields.get("ACTION", "").strip(),
+    )
+
+
+def _parse_response(text: str, expected: int) -> list[RiskNarrative] | None:
+    """Extract one narrative per risk, or nothing if the shape is wrong."""
+    parsed: dict[int, RiskNarrative] = {}
+
     for line in text.splitlines():
         match = _NUMBERED_LINE.match(line)
-        if match:
-            paragraphs[int(match.group(1))] = match.group(2).strip()
+        if not match:
+            continue
+        narrative = _parse_line(match.group(2))
+        if narrative is not None:
+            parsed[int(match.group(1))] = narrative
 
-    if len(paragraphs) != expected or set(paragraphs) != set(range(1, expected + 1)):
+    if len(parsed) != expected or set(parsed) != set(range(1, expected + 1)):
         logger.warning(
             "generated narration had the wrong shape",
             expected=expected,
-            received=len(paragraphs),
+            received=len(parsed),
         )
         return None
 
-    return [paragraphs[position] for position in range(1, expected + 1)]
+    return [parsed[position] for position in range(1, expected + 1)]
 
 
-def _mentions_unsupported_control(paragraph: str, control: RetrievedControl | None) -> bool:
+def _cites_unsupported_control(
+    narrative: RiskNarrative, control: RetrievedControl | None
+) -> bool:
     """Whether the text cites a control the evidence did not supply.
 
-    A fabricated control identifier is the failure that matters most here: it
+    A fabricated control identifier is the failure that matters most here. It
     reads as authoritative and sends somebody to the wrong requirement.
     """
     allowed = {control.control_id} if control is not None else set()
-    return any(found not in allowed for found in _CONTROL_PATTERN.findall(paragraph))
+    return any(found not in allowed for found in _CONTROL_PATTERN.findall(narrative.as_text()))
 
 
 class NarrationService:
@@ -210,8 +277,8 @@ class NarrationService:
 
     async def narrate(
         self, entries: list[tuple[ScoredRisk, RetrievedControl | None]]
-    ) -> tuple[list[str], str | None]:
-        """Return one paragraph per risk and the provider that produced them.
+    ) -> tuple[list[RiskNarrative], str | None]:
+        """Return one narrative per risk and the provider that produced them.
 
         The provider is ``None`` when narration was produced deterministically,
         which the report states rather than hides.
@@ -220,7 +287,7 @@ class NarrationService:
             return [], None
 
         fallback = [
-            deterministic_narration(scored, control) for scored, control in entries
+            deterministic_narrative(scored, control) for scored, control in entries
         ]
 
         if not self._chain.is_available:
@@ -230,16 +297,18 @@ class NarrationService:
         if generated is None:
             return fallback, None
 
-        paragraphs = _parse_response(generated, len(entries))
-        if paragraphs is None:
+        narratives = _parse_response(generated, len(entries))
+        if narratives is None:
             return fallback, None
 
-        verified: list[str] = []
-        for index, (paragraph, (_, control)) in enumerate(zip(paragraphs, entries, strict=True)):
-            if _mentions_unsupported_control(paragraph, control):
+        verified: list[RiskNarrative] = []
+        for index, (narrative, (_, control)) in enumerate(
+            zip(narratives, entries, strict=True)
+        ):
+            if _cites_unsupported_control(narrative, control):
                 logger.warning("generated text cited an unsupplied control", position=index + 1)
                 verified.append(fallback[index])
             else:
-                verified.append(paragraph)
+                verified.append(narrative)
 
         return verified, self._chain.last_used

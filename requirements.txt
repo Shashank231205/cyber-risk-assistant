@@ -1,4 +1,4 @@
-# Runtime dependencies -- pinned for reproducible builds.
+# Runtime dependencies: pinned for reproducible builds.
 # Generated from pyproject.toml by scripts/sync_requirements.py; do not edit by hand.
 fastapi==0.141.1
 fastembed==0.8.0

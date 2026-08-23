@@ -29,30 +29,35 @@ def render_entry(entry: RiskEntry) -> str:
     lines = [
         f"## {entry.position}. {entry.finding_name}",
         "",
-        entry.narrative,
+        entry.narrative.assessment,
         "",
-        f"- **Asset**: {entry.asset_name} "
-        f"({risk.asset.asset_type}, {risk.asset.environment.value.lower()}, "
-        f"{'internet-facing' if risk.is_internet_facing else 'internal'})",
-        f"- **Finding**: {entry.identifier} "
-        f"(severity {risk.vulnerability.cvss} of 10, open {risk.vulnerability.days_open} days)",
-        f"- **Threat activity**: {entry.threat_summary}",
-        f"- **Exploitation**: {entry.exploitation_status}",
-        f"- **Business service at risk**: {entry.service_name}",
     ]
-
-    if risk.service is not None and risk.service.business_impact:
-        lines.append(f"- **Impact if lost**: {risk.service.business_impact}")
+    lines.extend(
+        f"* **{label}.** {text}" for label, text in entry.narrative.points
+    )
+    lines.extend(
+        [
+            "",
+            f"* **Asset**: {entry.asset_name} "
+            f"({risk.asset.asset_type}, {risk.asset.environment.value.lower()}, "
+            f"{'internet-facing' if risk.is_internet_facing else 'internal'})",
+            f"* **Finding**: {entry.identifier} (severity "
+            f"{risk.vulnerability.cvss} of 10, open {risk.vulnerability.days_open} days)",
+            f"* **Threat activity**: {entry.threat_summary}",
+            f"* **Exploitation**: {entry.exploitation_status}",
+            f"* **Business service at risk**: {entry.service_name}",
+        ]
+    )
 
     if risk.exposure_conflict:
         lines.append(
-            "- **Data note**: sources disagree on whether this asset is "
+            "* **Data note**: sources disagree on whether this asset is "
             "internet-facing; the asset inventory was treated as authoritative"
         )
 
     lines.extend(["", f"**Risk score {entry.scored.score:.1f} of 100**, from:"])
     lines.extend(
-        f"  - {factor.name}: {factor.contribution:.1f} points"
+        f"  * {factor.name}: {factor.contribution:.1f} points"
         for factor in entry.scored.breakdown.ranked_factors
         if factor.contribution > 0
     )
@@ -63,13 +68,13 @@ def render_entry(entry: RiskEntry) -> str:
         lines.extend(
             [
                 "",
-                f"**Recommended control** — {control.citation}{confidence}",
+                f"**Recommended control**: {control.citation}{confidence}",
                 "",
                 f"> {control.excerpt}",
             ]
         )
     else:
-        lines.extend(["", "**Recommended control** — none retrieved for this finding."])
+        lines.extend(["", "**Recommended control**: none retrieved for this finding."])
 
     return "\n".join(lines)
 
@@ -91,8 +96,12 @@ def render_report(report: RiskReport) -> str:
         "",
     ]
 
-    if report.summary:
-        lines.extend(["## Summary for the board", "", report.summary, ""])
+    if report.summary.is_present:
+        lines.extend(["## Summary for the board", "", report.summary.position, ""])
+        lines.extend(
+            f"* **{label}.** {text}" for label, text in report.summary.points
+        )
+        lines.append("")
 
     lines.extend(["---", ""])
 
@@ -105,16 +114,16 @@ def render_report(report: RiskReport) -> str:
     lines.extend(["", "## What this report could not see", ""])
     if report.quality.issues:
         lines.extend(
-            f"- **{SEVERITY_LABELS[issue.severity]}** — {issue.summary} "
+            f"* **{SEVERITY_LABELS[issue.severity]}**: {issue.summary} "
             f"({issue.affected_count} affected)"
             + (f" {issue.detail}" if issue.detail else "")
             for issue in report.quality.ordered
         )
     else:
-        lines.append("- No data quality issues were detected.")
+        lines.append("* No data quality issues were detected.")
 
     lines.append(
-        f"- {report.intelligence_set_aside} threat intelligence records were set "
+        f"* {report.intelligence_set_aside} threat intelligence records were set "
         "aside as industry background with no match in this estate."
     )
 
@@ -123,13 +132,13 @@ def render_report(report: RiskReport) -> str:
             "",
             "## Provenance",
             "",
-            f"- Generated: {provenance.generated_at}",
-            f"- Reference data retrieved: {provenance.reference_retrieved_at or 'unknown'}",
-            f"- Exploited vulnerability catalogue: "
+            f"* Generated: {provenance.generated_at}",
+            f"* Reference data retrieved: {provenance.reference_retrieved_at or 'unknown'}",
+            f"* Exploited vulnerability catalogue: "
             f"{provenance.exploited_catalogue_entries:,} entries",
-            f"- Control catalogue: {provenance.controls_indexed:,} controls indexed",
-            f"- Narration produced by: {provenance.narration_source}",
-            "- Guidance is quoted from NIST SP 800-53 Rev. 5 as retrieved, not "
+            f"* Control catalogue: {provenance.controls_indexed:,} controls indexed",
+            f"* Narration produced by: {provenance.narration_source}",
+            "* Guidance is quoted from NIST SP 800-53 Rev. 5 as retrieved, not "
             "recalled from a model.",
         ]
     )

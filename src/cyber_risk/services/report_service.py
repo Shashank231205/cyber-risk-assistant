@@ -1,7 +1,7 @@
 """Assembling the risk report.
 
-This is the orchestration layer. It owns the sequence -- load, correlate,
-score, select, retrieve, narrate -- and nothing else: every step is
+This is the orchestration layer. It owns the sequence: load, correlate,
+score, select, retrieve, narrate: and nothing else: every step is
 implemented elsewhere and injected here, so the pipeline can be re-ordered or
 a stage replaced without touching the components.
 
@@ -26,6 +26,7 @@ from cyber_risk.ingestion.reference_data import (
 )
 from cyber_risk.models.report import ReportProvenance, RiskEntry, RiskReport
 from cyber_risk.models.risk import KevEntry, ScoredRisk
+from cyber_risk.models.summary import ExecutiveSummary
 from cyber_risk.retrieval.retriever import ControlRetriever, RetrievedControl
 from cyber_risk.scoring.engine import rank_risks, select_top_risks
 from cyber_risk.services.correlation import correlate, unmatched_intelligence
@@ -123,7 +124,7 @@ class ReportService:
         summary = (
             await self._summary.summarise(figures)
             if self._summary is not None
-            else ""
+            else ExecutiveSummary()
         )
 
         report = RiskReport(

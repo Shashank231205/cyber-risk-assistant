@@ -55,9 +55,7 @@ class CyberRiskError(Exception):
         return {"error": self.error_code, "message": self.message}
 
 
-# ---------------------------------------------------------------------------
 # Configuration
-# ---------------------------------------------------------------------------
 class ConfigurationError(CyberRiskError):
     """Raised when the application is misconfigured and cannot start."""
 
@@ -65,9 +63,7 @@ class ConfigurationError(CyberRiskError):
     error_code = "configuration_error"
 
 
-# ---------------------------------------------------------------------------
 # Data ingestion
-# ---------------------------------------------------------------------------
 class DataError(CyberRiskError):
     """Base class for failures loading or validating input data."""
 
@@ -98,9 +94,7 @@ class ReferenceDataError(DataError):
     error_code = "reference_data_error"
 
 
-# ---------------------------------------------------------------------------
 # Retrieval
-# ---------------------------------------------------------------------------
 class RetrievalError(CyberRiskError):
     """Base class for vector index and retrieval failures."""
 
@@ -120,9 +114,7 @@ class EmbeddingError(RetrievalError):
     error_code = "embedding_error"
 
 
-# ---------------------------------------------------------------------------
 # Language model providers
-# ---------------------------------------------------------------------------
 class LLMError(CyberRiskError):
     """Base class for language model provider failures."""
 
@@ -147,9 +139,7 @@ class LLMResponseError(LLMError):
     error_code = "llm_response_error"
 
 
-# ---------------------------------------------------------------------------
 # Risk model
-# ---------------------------------------------------------------------------
 class RiskModelError(CyberRiskError):
     """Raised when the risk model cannot produce a ranking."""
 
@@ -157,9 +147,7 @@ class RiskModelError(CyberRiskError):
     error_code = "risk_model_error"
 
 
-# ---------------------------------------------------------------------------
 # API surface
-# ---------------------------------------------------------------------------
 class AuthorizationError(CyberRiskError):
     """Raised when a caller is not permitted to access a resource."""
 

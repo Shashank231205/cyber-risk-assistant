@@ -3,7 +3,7 @@
 
 ``pyproject.toml`` is the single source of truth for dependencies. Plain
 requirement files are still needed for platforms that build from them
-directly, so they are generated rather than hand-maintained -- a duplicated
+directly, so they are generated rather than hand-maintained: a duplicated
 dependency list edited by hand drifts out of sync silently.
 
 Pins are taken from the versions actually resolved in the current
@@ -83,11 +83,11 @@ def _render() -> tuple[str, str]:
     runtime = sorted(_pin(dep) for dep in project["dependencies"])
     dev = sorted(_pin(dep) for dep in project["optional-dependencies"]["dev"])
 
-    runtime_text = HEADER.format(title="Runtime dependencies -- pinned for reproducible builds.")
+    runtime_text = HEADER.format(title="Runtime dependencies: pinned for reproducible builds.")
     runtime_text += "\n".join(runtime) + "\n"
 
     dev_text = HEADER.format(
-        title="Development and CI dependencies -- pinned for reproducible builds."
+        title="Development and CI dependencies: pinned for reproducible builds."
     )
     dev_text += "-r requirements.txt\n" + "\n".join(dev) + "\n"
 

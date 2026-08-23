@@ -68,7 +68,7 @@ def _parse_flag(value: Any) -> Any:
 
 
 #: Sentinel strings the source files use to mean "no value". Left in place they
-#: would be counted as a real entry -- for example a service marked "None" for
+#: would be counted as a real entry. A service marked "None" for
 #: compliance scope would otherwise register as regulated and attract weighting
 #: it has not earned.
 _NULL_SENTINELS = frozenset({"none", "n/a", "na", "null", "-", "unknown"})

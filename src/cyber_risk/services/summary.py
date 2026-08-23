@@ -17,6 +17,7 @@ from pathlib import Path
 from cyber_risk.core.logging import get_logger
 from cyber_risk.models.quality import DataQualityReport
 from cyber_risk.models.report import RiskEntry
+from cyber_risk.models.summary import ExecutiveSummary
 from cyber_risk.services.llm import ProviderChain
 
 logger = get_logger(__name__)
@@ -26,7 +27,34 @@ PROMPT_PATH = Path(__file__).resolve().parent.parent / "prompts" / "executive_su
 #: Longest acceptable generated summary. A board paragraph that runs long has
 #: stopped being a summary, and an over-long response usually means the model
 #: has started listing detail that belongs in the risk entries.
-MAX_SUMMARY_CHARS = 1200
+MAX_SUMMARY_CHARS = 1600
+
+# Field labels within the response line, in the order the instructions specify.
+_FIELD_LABELS = ("POSITION", "EXPOSURE", "CONSEQUENCE", "CONFIDENCE")
+
+
+def _parse_summary(text: str) -> ExecutiveSummary | None:
+    """Split the response into its four labelled fields."""
+    fields: dict[str, str] = {}
+
+    for segment in text.split("||"):
+        cleaned = segment.strip()
+        for label in _FIELD_LABELS:
+            prefix = f"{label}:"
+            if cleaned.upper().startswith(prefix):
+                fields[label] = cleaned[len(prefix) :].strip()
+                break
+
+    if not fields.get("POSITION"):
+        logger.warning("generated summary had no position statement")
+        return None
+
+    return ExecutiveSummary(
+        position=fields["POSITION"],
+        exposure=fields.get("EXPOSURE", ""),
+        consequence=fields.get("CONSEQUENCE", ""),
+        confidence=fields.get("CONFIDENCE", ""),
+    )
 
 
 class SummaryFigures:
@@ -84,22 +112,25 @@ class SummaryFigures:
         )
 
 
-def deterministic_summary(figures: SummaryFigures) -> str:
-    """Compose the summary without a language model."""
+def deterministic_summary(figures: SummaryFigures) -> ExecutiveSummary:
+    """Compose the four fields from the figures, without a language model."""
     if figures.presented == 0:
-        return (
-            f"We reviewed {figures.total_findings} open findings across "
-            f"{figures.total_assets} assets and could not rank any risk from the "
-            "available data."
+        return ExecutiveSummary(
+            position=(
+                f"We reviewed {figures.total_findings} open findings across "
+                f"{figures.total_assets} assets and could not rank any risk from "
+                "the available data."
+            )
         )
 
-    sentences = [
+    position = (
         f"We reviewed {figures.total_findings} open findings across "
         f"{figures.total_assets} assets and identified {figures.presented} that "
-        "warrant immediate attention."
-    ]
+        "warrant immediate attention. These are the exposures most likely to be "
+        "used against us in the coming weeks."
+    )
 
-    concentration = []
+    concentration: list[str] = []
     if figures.internet_facing:
         concentration.append(
             f"{figures.internet_facing} sit on systems reachable directly from the internet"
@@ -110,28 +141,30 @@ def deterministic_summary(figures: SummaryFigures) -> str:
         )
     if figures.ransomware_linked:
         concentration.append(f"{figures.ransomware_linked} are linked to ransomware activity")
-    if concentration:
-        sentences.append(f"Of these, {', and '.join(concentration)}.")
+    exposure = f"Of these, {', and '.join(concentration)}." if concentration else ""
 
+    consequence = ""
     if figures.services:
         consequence = f"They affect {', '.join(figures.services)}"
         if figures.regimes:
             consequence += (
                 f", placing {' and '.join(figures.regimes)} obligations at risk "
-                "if any is compromised"
+                "if any one is compromised"
             )
-        sentences.append(consequence + ".")
+        consequence += "."
 
-    if figures.gaps:
-        sentences.append(
-            "Two limits should be noted alongside this: " + "; ".join(figures.gaps) + "."
-            if len(figures.gaps) == 2
-            else "The following limits apply to this assessment: "
-            + "; ".join(figures.gaps)
-            + "."
-        )
+    confidence = (
+        "Our view is incomplete: " + "; ".join(figures.gaps) + "."
+        if figures.gaps
+        else "No coverage gaps were detected in the supplied data."
+    )
 
-    return " ".join(sentences)
+    return ExecutiveSummary(
+        position=position,
+        exposure=exposure,
+        consequence=consequence,
+        confidence=confidence,
+    )
 
 
 class SummaryService:
@@ -140,7 +173,7 @@ class SummaryService:
     def __init__(self, chain: ProviderChain) -> None:
         self._chain = chain
 
-    async def summarise(self, figures: SummaryFigures) -> str:
+    async def summarise(self, figures: SummaryFigures) -> ExecutiveSummary:
         """Return the summary, falling back to the deterministic version."""
         fallback = deterministic_summary(figures)
 
@@ -158,4 +191,5 @@ class SummaryService:
             logger.warning("generated summary was unusable", length=len(cleaned))
             return fallback
 
-        return cleaned
+        parsed = _parse_summary(cleaned)
+        return parsed if parsed is not None else fallback

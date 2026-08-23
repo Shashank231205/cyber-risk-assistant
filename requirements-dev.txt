@@ -1,4 +1,4 @@
-# Development and CI dependencies -- pinned for reproducible builds.
+# Development and CI dependencies: pinned for reproducible builds.
 # Generated from pyproject.toml by scripts/sync_requirements.py; do not edit by hand.
 -r requirements.txt
 bandit[toml]==1.9.4

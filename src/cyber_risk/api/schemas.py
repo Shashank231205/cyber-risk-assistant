@@ -39,6 +39,17 @@ class ControlResponse(BaseModel):
     is_weak_match: bool
 
 
+class NarrativeResponse(BaseModel):
+    """The prose written for one risk."""
+
+    model_config = ConfigDict(frozen=True)
+
+    assessment: str
+    threat: str
+    impact: str
+    action: str
+
+
 class RiskResponse(BaseModel):
     """One ranked risk."""
 
@@ -46,7 +57,7 @@ class RiskResponse(BaseModel):
 
     position: int
     score: float
-    narrative: str
+    narrative: NarrativeResponse
     asset: str
     asset_type: str
     environment: str
@@ -72,7 +83,12 @@ class RiskResponse(BaseModel):
         return cls(
             position=entry.position,
             score=round(entry.scored.score, 1),
-            narrative=entry.narrative,
+            narrative=NarrativeResponse(
+                assessment=entry.narrative.assessment,
+                threat=entry.narrative.threat,
+                impact=entry.narrative.impact,
+                action=entry.narrative.action,
+            ),
             asset=entry.asset_name,
             asset_type=risk.asset.asset_type,
             environment=risk.asset.environment.value,
@@ -136,12 +152,23 @@ class ProvenanceResponse(BaseModel):
     weights: dict[str, float]
 
 
+class SummaryResponse(BaseModel):
+    """The board-level opening of the report."""
+
+    model_config = ConfigDict(frozen=True)
+
+    position: str
+    exposure: str
+    consequence: str
+    confidence: str
+
+
 class ReportResponse(BaseModel):
     """The complete report."""
 
     model_config = ConfigDict(frozen=True)
 
-    summary: str
+    summary: SummaryResponse
     risks: tuple[RiskResponse, ...]
     total_findings: int
     total_assets: int
@@ -154,7 +181,12 @@ class ReportResponse(BaseModel):
         """Project the report onto the public shape."""
         provenance = report.provenance
         return cls(
-            summary=report.summary,
+            summary=SummaryResponse(
+                position=report.summary.position,
+                exposure=report.summary.exposure,
+                consequence=report.summary.consequence,
+                confidence=report.summary.confidence,
+            ),
             risks=tuple(RiskResponse.from_entry(entry) for entry in report.entries),
             total_findings=report.total_findings,
             total_assets=report.total_assets,

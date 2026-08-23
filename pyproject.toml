@@ -46,9 +46,7 @@ where = ["src"]
 [tool.setuptools.package-data]
 cyber_risk = ["py.typed", "prompts/*.md"]
 
-# ---------------------------------------------------------------------------
-# Ruff -- lint + format
-# ---------------------------------------------------------------------------
+# Ruff: lint + format
 [tool.ruff]
 line-length = 100
 target-version = "py310"
@@ -65,7 +63,7 @@ select = [
     "A",         # flake8-builtins
     "C4",        # flake8-comprehensions
     "DTZ",       # flake8-datetimez
-    "T20",       # flake8-print   -- no stray print() in library code
+    "T20",       # flake8-print  : no stray print() in library code
     "SIM",       # flake8-simplify
     "PTH",       # flake8-use-pathlib
     "RET",       # flake8-return
@@ -76,7 +74,7 @@ select = [
     "D",         # pydocstyle
 ]
 ignore = [
-    "D107",  # __init__ docstring -- covered by the class docstring
+    "D107",  # __init__ docstring: covered by the class docstring
     "D203",  # incompatible with D211
     "D213",  # incompatible with D212
     "TRY003",# long messages in raise are acceptable and readable here
@@ -92,9 +90,7 @@ ignore = [
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 
-# ---------------------------------------------------------------------------
-# mypy -- strict
-# ---------------------------------------------------------------------------
+# mypy: strict
 [tool.mypy]
 python_version = "3.10"
 strict = true
@@ -109,9 +105,7 @@ plugins = ["pydantic.mypy"]
 module = ["fastembed.*", "faiss.*", "slowapi.*", "tomllib", "tomli"]
 ignore_missing_imports = true
 
-# ---------------------------------------------------------------------------
 # pytest
-# ---------------------------------------------------------------------------
 [tool.pytest.ini_options]
 minversion = "8.0"
 testpaths = ["tests"]
@@ -148,9 +142,7 @@ exclude_lines = [
     '^\s*\.\.\.$',
 ]
 
-# ---------------------------------------------------------------------------
-# Bandit -- SAST
-# ---------------------------------------------------------------------------
+# Bandit: SAST
 [tool.bandit]
 exclude_dirs = ["tests", ".venv", "build", "dist"]
 
